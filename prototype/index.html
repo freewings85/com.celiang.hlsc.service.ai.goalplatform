@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GoalPlatform · 目标与计划管理 · 原型</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e5e8ee;
+    --side:#0f172a; --side-ink:#cbd5e1; --side-active:#1e293b;
+    --primary:#4f46e5; --primary-weak:#eef2ff;
+    --ok:#16a34a; --ok-weak:#e9f7ef; --bad:#dc2626; --bad-weak:#fdecec;
+    --warn:#d97706; --warn-weak:#fdf2e3; --info:#0ea5e9;
+    --radius:12px; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .app{display:flex;min-height:100vh}
+  /* sidebar */
+  .sidebar{width:236px;background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;flex-shrink:0}
+  .brand{display:flex;align-items:center;gap:10px;padding:18px 18px 14px}
+  .brand .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#6366f1,#22d3ee);display:grid;place-items:center;color:#fff;font-weight:800}
+  .brand b{color:#fff;font-size:15px;letter-spacing:.3px}
+  .brand small{display:block;color:#64748b;font-size:11px;font-weight:500}
+  .nav{padding:8px}
+  .nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;color:var(--side-ink);text-decoration:none;border-radius:8px;font-size:13.5px;cursor:pointer;margin:2px 0}
+  .nav a:hover{background:#1a2436;color:#fff}
+  .nav a.active{background:var(--side-active);color:#fff}
+  .nav .sec{color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.6px;padding:14px 12px 4px}
+  .nav a.backglobal{color:#93c5fd;font-size:12.5px;margin-bottom:2px}
+  .nav a.backglobal:hover{color:#fff}
+  .syspick{margin:2px 8px 8px;padding:9px 12px;background:#1e293b;border-radius:8px;color:#94a3b8;font-size:11px}
+  .syspick b{color:#fff;font-size:13.5px;display:block;margin-top:2px}
+  .side-foot{margin-top:auto;padding:14px 16px;border-top:1px solid #1e293b;font-size:12px;color:#64748b}
+  /* main */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{height:56px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 22px;position:sticky;top:0;z-index:5}
+  .crumb{font-weight:600;font-size:15px}
+  .crumb span{color:var(--muted);font-weight:500}
+  .cyclepick{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .cyclepick select{width:auto;padding:7px 10px}
+  .search{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 12px;color:var(--muted);width:200px;font-size:13px}
+  .avatar{width:32px;height:32px;border-radius:50%;background:#4f46e5;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:600}
+  .content{padding:22px 26px;max-width:1180px;width:100%}
+  h2.page{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--muted);margin:0 0 18px}
+  /* cards */
+  .grid{display:grid;gap:16px}
+  .stats{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .pad{padding:16px 18px}
+  .stat{padding:16px 18px}
+  .stat .k{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:6px}
+  .stat .v{font-size:26px;font-weight:700;margin-top:6px}
+  .stat .d{font-size:12px;margin-top:2px}
+  .up{color:var(--ok)} .down{color:var(--bad)} .flat{color:var(--muted)}
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin:24px 0 12px}
+  .section-title h3{margin:0;font-size:15px}
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:500}
+  .btn:hover{background:#f8fafc}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:#4338ca}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;padding:11px 14px;border-bottom:1px solid var(--line);background:#fbfcfe}
+  td{padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr.click{cursor:pointer}
+  tr.click:hover td{background:#f8fafc}
+  .tbl-wrap{overflow:hidden;border-radius:var(--radius);border:1px solid var(--line);background:#fff;box-shadow:var(--shadow)}
+  /* pills / badges */
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .pill.ok{background:var(--ok-weak);color:var(--ok)}
+  .pill.bad{background:var(--bad-weak);color:var(--bad)}
+  .pill.warn{background:var(--warn-weak);color:var(--warn)}
+  .pill.run{background:#fef9c3;color:#a16207}
+  .pill.neutral{background:#eef2f7;color:#475569}
+  .pill.new{background:var(--primary-weak);color:var(--primary)}
+  .tag{display:inline-block;padding:1px 8px;border-radius:6px;background:#eef2f7;color:#475569;font-size:11.5px;margin-right:4px}
+  .tag.v{background:var(--primary-weak);color:var(--primary)}
+  .tag.cyc{background:#e0f2fe;color:#0369a1}
+  .muted{color:var(--muted)} .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  /* health dot */
+  .hdot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .hdot.ok{background:var(--ok)} .hdot.warn{background:var(--warn)} .hdot.bad{background:var(--bad)}
+  .htext.ok{color:var(--ok)} .htext.warn{color:var(--warn)} .htext.bad{color:var(--bad)}
+  /* progress bar */
+  .bar{height:8px;background:#eef2f7;border-radius:999px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#22d3ee)}
+  .bar.sm{height:6px}
+  .bar.warn>i{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+  .bar.bad>i{background:linear-gradient(90deg,#ef4444,#f87171)}
+  .pctlab{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+  /* goal tree */
+  .tree{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+  .grow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+  .grow:last-child{border-bottom:none}
+  .grow:hover{background:#f8fafc}
+  .chev{width:16px;text-align:center;color:var(--muted);font-size:11px;flex-shrink:0;transition:transform .12s}
+  .chev.col{transform:rotate(-90deg)}
+  .chev.leaf{visibility:hidden}
+  .gmain{flex:1;min-width:0}
+  .gtitle{font-weight:600;display:flex;align-items:center;gap:8px}
+  .gtitle .lv{font-size:10.5px;font-weight:700;color:var(--primary);background:var(--primary-weak);padding:1px 6px;border-radius:5px}
+  .gtitle .lv.sub{color:#0369a1;background:#e0f2fe}
+  .gmeta{color:var(--muted);font-size:12px;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap}
+  .gprog{width:150px;flex-shrink:0;text-align:right}
+  .gprog .bar{margin-top:4px}
+  .krbox{padding:2px 14px 12px 42px;background:#fbfcfe;border-bottom:1px solid var(--line)}
+  .kr{display:flex;align-items:center;gap:12px;padding:7px 0;border-bottom:1px dashed #eef2f7}
+  .kr:last-child{border-bottom:none}
+  .kr .knm{flex:1;font-size:12.5px}
+  .kr .kbar{width:120px}
+  .kr .kval{width:150px;text-align:right;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .kr .kval b{color:var(--ink)}
+  /* 交付阶段流水线（固定 5 阶段步进器） */
+  .pipe{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 8px}
+  .step{display:flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;background:#fff;color:var(--muted)}
+  .step .n{width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:#eef2f7;color:var(--muted);flex-shrink:0}
+  .step.done{background:var(--ok-weak);border-color:#bbe6cd;color:#15803d}
+  .step.done .n{background:var(--ok);color:#fff}
+  .step.run{background:#fef9c3;border-color:#fde68a;color:#a16207}
+  .step.run .n{background:var(--warn);color:#fff}
+  .step.blocked{background:var(--bad-weak);border-color:#f6c9c9;color:#991b1b}
+  .step.blocked .n{background:var(--bad);color:#fff}
+  .arr{color:#cbd5e1;align-self:center;font-size:12px}
+  /* 交付流水线总览（阶段看板） */
+  .board .grow{cursor:pointer}
+  .board .pipe{margin:6px 0 0}
+  .board .step{padding:5px 9px;font-size:11.5px}
+  .board .step .n{width:16px;height:16px;font-size:10px}
+  /* misc */
+  .row-flex{display:flex;gap:16px}.row-flex>*{flex:1}
+  .note{background:#f1f5ff;border:1px solid #dbe4ff;color:#3949ab;border-radius:10px;padding:10px 13px;font-size:12.5px;margin:2px 0 14px}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px}
+  .kv{display:grid;grid-template-columns:112px 1fr;gap:8px 14px;font-size:13px}
+  .kv .k{color:var(--muted)}
+  .filterbar{display:flex;gap:8px;align-items:center;margin:14px 0 12px;flex-wrap:wrap}
+  .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12.5px;cursor:pointer}
+  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:6px 0 16px}
+  .tabs .tab{padding:9px 14px;font-size:13.5px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-weight:500}
+  .tabs .tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+  /* wizard/modal */
+  .modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:50}
+  .modal.open{display:flex}
+  .dialog{background:#fff;border-radius:16px;width:640px;max-width:92vw;max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .dialog-h{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+  .dialog-h b{font-size:16px}
+  .x{cursor:pointer;color:var(--muted);font-size:20px;line-height:1}
+  .steps{display:flex;gap:6px;padding:16px 22px 4px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .steps .s{padding:4px 10px;border-radius:999px;background:#f1f5f9}
+  .steps .s.active{background:var(--primary);color:#fff}
+  .steps .s.done{background:var(--ok-weak);color:var(--ok)}
+  .dialog-b{padding:18px 22px}
+  .dialog-f{padding:14px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600}
+  select,input[type=text],input[type=number]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff}
+  textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:12.5px;min-height:64px;resize:vertical;background:#fff;font-family:inherit}
+  .segmented{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .segmented .seg{padding:7px 12px;font-size:12.5px;background:#fff;border:none;border-right:1px solid var(--line);cursor:pointer;color:var(--muted)}
+  .segmented .seg:last-child{border-right:none}
+  .segmented .seg.active{background:var(--primary);color:#fff}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">G</div>
+      <div><b>GoalPlatform</b><small>目标与计划管理 · 原型</small></div>
+    </div>
+
+    <!-- 第一层：全局 -->
+    <nav class="nav" id="nav-global">
+      <div class="sec">全局</div>
+      <a data-view="overview" class="active">📊 全局概览</a>
+      <a data-view="lines">🗂️ 业务线</a>
+      <a data-view="cycles">🗓️ 周期</a>
+      <div class="sec">平台</div>
+      <a data-view="settings">⚙️ 设置 / 集成</a>
+    </nav>
+
+    <!-- 第二层：进入某业务线 -->
+    <nav class="nav" id="nav-line" hidden>
+      <a class="backglobal" onclick="setMode('global')">← 返回全局</a>
+      <div class="syspick">当前业务线<b id="linePick">保险报价 Agent</b></div>
+      <div class="sec">业务线</div>
+      <a data-view="line-overview" class="active">🏠 业务线概览</a>
+      <a data-view="goals">🎯 目标树</a>
+      <a data-view="roadmap">🚦 交付流水线</a>
+      <a data-view="review">📈 复盘</a>
+      <div class="sec">其他</div>
+      <a data-view="line-settings">⚙️ 业务线设置</a>
+    </nav>
+
+    <div class="side-foot">目标/计划原生管理<br/>执行链接 · Jira / EddPlatform 评估</div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb" id="crumb">全局概览</div>
+      <div class="cyclepick">
+        <span class="muted" style="font-size:12px">周期</span>
+        <select id="cycleSel" onchange="onCycle()">
+          <option value="2026Q3">2026 Q3 · 进行中</option>
+          <option value="2026Q2">2026 Q2 · 已归档</option>
+          <option value="2026Q1">2026 Q1 · 已归档</option>
+        </select>
+        <input class="search" placeholder="搜索目标 / 计划 / 负责人…" />
+        <div class="avatar">李</div>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- ============ 全局层 ============ -->
+
+      <!-- 全局概览 -->
+      <section id="view-overview">
+        <h2 class="page">全局概览 <span class="tag cyc" id="ovCycle">2026 Q3</span></h2>
+        <p class="sub">公司级目标达成与健康度一览。周期人工更新为主，达成度由子目标 / KR 自动汇总。</p>
+
+        <div class="grid stats">
+          <div class="card stat"><div class="k">🗂️ 业务线（agent 产品）</div><div class="v">3</div><div class="d flat">保险报价 / 智能客服 / 理赔审核</div></div>
+          <div class="card stat"><div class="k">🎯 本周期目标</div><div class="v">12</div><div class="d flat">大目标 5 · 子目标 7</div></div>
+          <div class="card stat"><div class="k">📊 平均达成度</div><div class="v">61%</div><div class="d up">▲ 较上周 +6%</div></div>
+          <div class="card stat"><div class="k">🩺 健康度</div><div class="v"><span class="htext ok">6</span> / <span class="htext warn">4</span> / <span class="htext bad">2</span></div><div class="d flat">🟢 on-track · 🟡 at-risk · 🔴 off-track</div></div>
+        </div>
+
+        <div class="section-title"><h3>各业务线本周期进度</h3><a class="btn sm" data-view="lines" onclick="go('lines')">查看全部 →</a></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>业务线</th><th>负责人</th><th>大目标</th><th style="width:220px">平均达成度</th><th>健康</th><th>临期阶段</th></tr></thead>
+            <tbody>
+              <tr class="click" onclick="openLine('保险报价 Agent')">
+                <td><b>保险报价 Agent</b></td><td>李明</td><td>2</td>
+                <td><div style="display:flex;align-items:center;gap:10px"><div class="bar warn" style="flex:1"><i style="width:58%"></i></div><span class="pctlab">58%</span></div></td>
+                <td><span class="hdot warn"></span> <span class="htext warn">at-risk</span></td><td>2</td>
+              </tr>
+              <tr class="click" onclick="openLine('智能客服 Agent')">
+                <td><b>智能客服 Agent</b></td><td>周琳</td><td>2</td>
+                <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><i style="width:74%"></i></div><span class="pctlab">74%</span></div></td>
+                <td><span class="hdot ok"></span> <span class="htext ok">on-track</span></td><td>1</td>
+              </tr>
+              <tr class="click" onclick="openLine('理赔审核 Agent')">
+                <td><b>理赔审核 Agent</b></td><td>吴涛</td><td>1</td>
+                <td><div style="display:flex;align-items:center;gap:10px"><div class="bar bad" style="flex:1"><i style="width:41%"></i></div><span class="pctlab">41%</span></div></td>
+                <td><span class="hdot bad"></span> <span class="htext bad">off-track</span></td><td>0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-title"><h3>⏰ 临期阶段预警（结束时间 14 天内）</h3></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>阶段节点</th><th>所属目标</th><th>业务线</th><th>计划起止</th><th>状态</th><th>关联</th></tr></thead>
+            <tbody>
+              <tr><td>③ 开发完成</td><td class="muted">O1.1 报价引擎重构</td><td>保险报价</td><td class="mono">07-08 ~ 07-30</td><td><span class="pill run">● 进行中</span></td><td><span class="mono muted">QUOTE-1203 ↗</span></td></tr>
+              <tr><td>② 方案确定</td><td class="muted">O1.2 多业务方接入</td><td>保险报价</td><td class="mono">07-15 ~ 07-22</td><td><span class="pill bad">● 阻塞</span></td><td><span class="mono muted">QUOTE-1250 ↗</span></td></tr>
+              <tr><td>① 业务需求确定</td><td class="muted">O「客服首解率提升」</td><td>智能客服</td><td class="mono">07-18 ~ 07-24</td><td><span class="pill warn">● 待开始</span></td><td><span class="mono muted">CS-880 ↗</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 业务线列表 -->
+      <section id="view-lines" hidden>
+        <h2 class="page">业务线 <span class="muted">(3)</span></h2>
+        <p class="sub">每条业务线 = 一个 agent 产品；目标与计划都按业务线分组。点进去看目标树。</p>
+        <div style="text-align:right;margin-bottom:12px"><button class="btn primary" onclick="alert('原型占位：新建业务线')">＋ 新建业务线</button></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>业务线</th><th>负责人</th><th>本周期大目标</th><th>子目标</th><th style="width:200px">平均达成度</th><th>健康</th><th></th></tr></thead>
+            <tbody>
+              <tr class="click" onclick="openLine('保险报价 Agent')"><td><b>保险报价 Agent</b><div class="muted" style="font-size:12px">车险 / 财险智能报价</div></td><td>李明</td><td>2</td><td>3</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar warn" style="flex:1"><i style="width:58%"></i></div><span class="pctlab">58%</span></div></td>
+                <td><span class="hdot warn"></span> at-risk</td><td class="muted">进入 →</td></tr>
+              <tr class="click" onclick="openLine('智能客服 Agent')"><td><b>智能客服 Agent</b><div class="muted" style="font-size:12px">在线客服首解</div></td><td>周琳</td><td>2</td><td>2</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1"><i style="width:74%"></i></div><span class="pctlab">74%</span></div></td>
+                <td><span class="hdot ok"></span> on-track</td><td class="muted">进入 →</td></tr>
+              <tr class="click" onclick="openLine('理赔审核 Agent')"><td><b>理赔审核 Agent</b><div class="muted" style="font-size:12px">理赔材料智能审核</div></td><td>吴涛</td><td>1</td><td>2</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar bad" style="flex:1"><i style="width:41%"></i></div><span class="pctlab">41%</span></div></td>
+                <td><span class="hdot bad"></span> off-track</td><td class="muted">进入 →</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 周期 -->
+      <section id="view-cycles" hidden>
+        <h2 class="page">周期</h2>
+        <p class="sub">目标按周期（季度 / 月）迭代。当前周期进行中，可归档、看历史、新建下一周期。</p>
+        <div style="text-align:right;margin-bottom:12px"><button class="btn primary" onclick="alert('原型占位：新建下一周期 2026 Q4，可从本周期结转未完成目标')">＋ 新建下一周期</button></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>周期</th><th>起止</th><th>目标数</th><th>平均达成</th><th>状态</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><b>2026 Q3</b></td><td>2026-07-01 ~ 09-30</td><td>12</td><td>61%</td><td><span class="pill run">● 进行中</span></td><td><a class="btn sm" onclick="alert('原型占位：归档本周期')">归档</a></td></tr>
+              <tr><td>2026 Q2</td><td>2026-04-01 ~ 06-30</td><td>10</td><td>83%</td><td><span class="pill neutral">已归档</span></td><td><a class="btn sm" onclick="alert('原型占位：查看历史复盘')">看复盘</a></td></tr>
+              <tr><td>2026 Q1</td><td>2026-01-01 ~ 03-31</td><td>9</td><td>78%</td><td><span class="pill neutral">已归档</span></td><td><a class="btn sm" onclick="alert('原型占位：查看历史复盘')">看复盘</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note" style="margin-top:16px">周期是「目标的迭代桶」。每个目标自身还带独立的时间窗口（起止）与节点，见目标详情。</div>
+      </section>
+
+      <!-- 设置 / 集成 -->
+      <section id="view-settings" hidden>
+        <h2 class="page">设置 / 集成</h2>
+        <p class="sub">目标与计划原生托管在本平台；执行层与达成度对接外部系统（本版以人工更新为主，集成为可选增强）。</p>
+        <div class="grid" style="grid-template-columns:1fr 1fr">
+          <div class="card pad">
+            <h3 style="margin:0 0 8px">🔗 Jira（执行层）</h3>
+            <p class="muted" style="font-size:12.5px;margin:0 0 12px">把 5 阶段节点关联到 Jira Epic / Issue。执行详情与状态以 Jira 为准，平台只做关联与跳转。</p>
+            <div class="kv"><span class="k">状态</span><span><span class="pill ok">● 已连接</span> hlsc.atlassian.net</span><span class="k">默认项目</span><span class="mono">QUOTE / CS / CLAIM</span></div>
+          </div>
+          <div class="card pad">
+            <h3 style="margin:0 0 8px">📊 EddPlatform（达成度·可选）</h3>
+            <p class="muted" style="font-size:12.5px;margin:0 0 12px">后续可把 KR「达成度」接到 EddPlatform 的评估通过率 / 上线指标，回答「目标真兑现了没」。本版预留接口，默认人工更新。</p>
+            <div class="kv"><span class="k">状态</span><span><span class="pill neutral">未接入（预留）</span></span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 业务线层 ============ -->
+
+      <!-- 业务线概览 -->
+      <section id="view-line-overview" hidden>
+        <h2 class="page" id="lineTitleO">保险报价 Agent</h2>
+        <p class="sub">本周期 <span class="tag cyc">2026 Q3</span> · 负责人 李明 · 车险 / 财险智能报价</p>
+
+        <div class="grid stats">
+          <div class="card stat"><div class="k">🎯 大目标</div><div class="v">2</div><div class="d flat">含子目标 3</div></div>
+          <div class="card stat"><div class="k">📊 业务线达成度</div><div class="v">58%</div><div class="d up">▲ +6%</div></div>
+          <div class="card stat"><div class="k">🩺 健康</div><div class="v htext warn">at-risk</div><div class="d flat">1 项子目标 off-track</div></div>
+          <div class="card stat"><div class="k">🚦 交付阶段</div><div class="v">开发中</div><div class="d flat">2 目标在开发 · 1 阻塞</div></div>
+        </div>
+
+        <div class="section-title"><h3>本周期大目标</h3><a class="btn sm" onclick="go('goals')">看完整目标树 →</a></div>
+        <div class="tree">
+          <div class="grow" onclick="openGoal('O1')">
+            <span class="chev leaf">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv">O1</span> 把报价 Agent 做成可规模化交付的标品</div>
+              <div class="gmeta"><span>👤 李明</span><span>📅 07-01 ~ 09-30</span><span><span class="hdot warn"></span> at-risk</span><span>汇总自 3 KR · 2 子目标</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">58%</span><div class="bar warn"><i style="width:58%"></i></div></div>
+          </div>
+          <div class="grow" onclick="openGoal('O2')">
+            <span class="chev leaf">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv">O2</span> 降本：单次报价 LLM 成本下降 40%</div>
+              <div class="gmeta"><span>👤 陈磊</span><span>📅 07-01 ~ 09-30</span><span><span class="hdot ok"></span> on-track</span><span>汇总自 2 KR</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">72%</span><div class="bar"><i style="width:72%"></i></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 目标树（★核心） -->
+      <section id="view-goals" hidden>
+        <h2 class="page">目标树 <span class="tag cyc">2026 Q3</span></h2>
+        <p class="sub">大目标 → 子目标递归拆解，每层带负责人 / 周期 / 健康 / 达成度。展开看 KR。非叶子目标达成度自动汇总。</p>
+        <div class="filterbar">
+          <button class="btn primary sm" onclick="openWizard()">＋ 新建目标</button>
+          <span style="width:8px"></span>
+          <span class="muted" style="font-size:12px">健康：</span>
+          <button class="chip active" onclick="filterGoals(this,'all')">全部</button>
+          <button class="chip" onclick="filterGoals(this,'ok')">🟢 on-track</button>
+          <button class="chip" onclick="filterGoals(this,'warn')">🟡 at-risk</button>
+          <button class="chip" onclick="filterGoals(this,'bad')">🔴 off-track</button>
+        </div>
+
+        <div class="tree" id="goalTree">
+          <!-- O1 大目标 -->
+          <div class="grow" data-path="O1" data-h="warn" onclick="openGoal('O1')">
+            <span class="chev" onclick="toggleTree(event,'O1')">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv">O1 大目标</span> 把报价 Agent 做成可规模化交付的标品</div>
+              <div class="gmeta"><span>👤 李明</span><span>📅 07-01 ~ 09-30</span><span><span class="hdot warn"></span> at-risk</span><span>汇总自 3 KR · 2 子目标</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">58%</span><div class="bar warn"><i style="width:58%"></i></div></div>
+          </div>
+          <div class="krbox" data-krof="O1">
+            <div class="kr"><span class="knm">KR1 · 报价准确率 88% → 95%</span><div class="kbar"><div class="bar sm"><i style="width:67%"></i></div></div><span class="kval">当前 <b>92%</b> · 67%</span></div>
+            <div class="kr"><span class="knm">KR2 · 平均报价时延 9s → 3s</span><div class="kbar"><div class="bar sm"><i style="width:67%"></i></div></div><span class="kval">当前 <b>5s</b> · 67%</span></div>
+            <div class="kr"><span class="knm">KR3 · 接入业务方 2 → 8 家</span><div class="kbar"><div class="bar sm bad"><i style="width:33%"></i></div></div><span class="kval">当前 <b>4 家</b> · 33%</span></div>
+          </div>
+          <!-- O1.1 子目标 -->
+          <div class="grow" data-path="O1/O1.1" data-h="ok" style="padding-left:38px" onclick="openGoal('O1.1')">
+            <span class="chev leaf">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv sub">子目标</span> O1.1 报价引擎重构（可维护 / 可扩展）</div>
+              <div class="gmeta"><span>👤 王芳</span><span>📅 07-01 ~ 08-20</span><span><span class="hdot ok"></span> on-track</span><span>1 KR · 阶段 3/5 开发中</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">80%</span><div class="bar"><i style="width:80%"></i></div></div>
+          </div>
+          <!-- O1.2 子目标 -->
+          <div class="grow" data-path="O1/O1.2" data-h="bad" style="padding-left:38px" onclick="openGoal('O1.2')">
+            <span class="chev leaf">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv sub">子目标</span> O1.2 多业务方接入（SDK + SOP）</div>
+              <div class="gmeta"><span>👤 张伟</span><span>📅 07-10 ~ 09-25</span><span><span class="hdot bad"></span> off-track</span><span>2 KR · 阶段 2/5 阻塞</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">30%</span><div class="bar bad"><i style="width:30%"></i></div></div>
+          </div>
+
+          <!-- O2 大目标 -->
+          <div class="grow" data-path="O2" data-h="ok" onclick="openGoal('O2')">
+            <span class="chev" onclick="toggleTree(event,'O2')">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv">O2 大目标</span> 降本：单次报价 LLM 成本下降 40%</div>
+              <div class="gmeta"><span>👤 陈磊</span><span>📅 07-01 ~ 09-30</span><span><span class="hdot ok"></span> on-track</span><span>汇总自 2 KR · 1 子目标</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">72%</span><div class="bar"><i style="width:72%"></i></div></div>
+          </div>
+          <div class="krbox" data-krof="O2">
+            <div class="kr"><span class="knm">KR1 · 缓存命中率 30% → 80%</span><div class="kbar"><div class="bar sm"><i style="width:76%"></i></div></div><span class="kval">当前 <b>68%</b> · 76%</span></div>
+            <div class="kr"><span class="knm">KR2 · 单次成本 ¥0.12 → ¥0.07</span><div class="kbar"><div class="bar sm"><i style="width:70%"></i></div></div><span class="kval">当前 <b>¥0.085</b> · 70%</span></div>
+          </div>
+          <div class="grow" data-path="O2/O2.1" data-h="ok" style="padding-left:38px" onclick="openGoal('O2.1')">
+            <span class="chev leaf">▾</span>
+            <div class="gmain">
+              <div class="gtitle"><span class="lv sub">子目标</span> O2.1 Prompt 瘦身 + 缓存策略</div>
+              <div class="gmeta"><span>👤 陈磊</span><span>📅 07-05 ~ 09-10</span><span><span class="hdot ok"></span> on-track</span><span>1 KR · 阶段 3/5 开发中</span></div>
+            </div>
+            <div class="gprog"><span class="pctlab">70%</span><div class="bar"><i style="width:70%"></i></div></div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:14px">💡 <b>达成度怎么算</b>：叶子目标可人工直接填；大目标（非叶子）达成度 = 其 KR 与子目标按权重自动汇总，实时算、不落库。这是本平台相对普通 OKR 表格的核心价值。</div>
+      </section>
+
+      <!-- 目标详情（点进任一层目标：先「进度执行」，后「子目标」；数据驱动渲染） -->
+      <section id="view-goal" hidden>
+        <div id="goalDetail"></div>
+      </section>
+
+      <!-- 交付流水线总览（每个目标走同一条固定 5 阶段） -->
+      <section id="view-roadmap" hidden>
+        <h2 class="page">交付流水线 <span class="tag cyc">2026 Q3</span></h2>
+        <p class="sub">每个目标（大 / 小）都走同一条固定 5 阶段：业务需求确定 → 方案确定 → 开发完成 → 测试 → 发布上线。此页看各目标当前卡在哪一阶段。点目标进详情。</p>
+        <div class="board" id="roadmapBoard"></div>
+        <div class="note" style="margin-top:14px">🟢 已完成 · 🟡 进行中 · 🔴 阻塞 · ⚪ 待开始。每阶段带产出物（流程图/建模图、方案 spec、测试 spec…），可关联 Jira 执行项。</div>
+      </section>
+
+      <!-- 复盘 -->
+      <section id="view-review" hidden>
+        <h2 class="page">复盘 · 保险报价 Agent <span class="tag cyc">2026 Q3</span></h2>
+        <p class="sub">周期达成度按目标卷积汇总；与上一周期对照，看改善 / 回归。达成 = 目标下 KR 与子目标全部达标。</p>
+
+        <div class="tabs">
+          <div class="tab active">本周期进行中</div>
+          <div class="tab" onclick="alert('原型占位：切到 2026 Q2 已归档复盘')">对照 2026 Q2</div>
+        </div>
+
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>目标</th><th>负责人</th><th style="width:180px">达成度</th><th>健康</th><th>判定</th></tr></thead>
+            <tbody>
+              <tr><td><b>O1</b> 可规模化交付标品</td><td>李明</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar warn" style="flex:1"><i style="width:58%"></i></div><span class="pctlab">58%</span></div></td>
+                <td><span class="hdot warn"></span> at-risk</td><td><span class="pill warn">未达标 · 待冲刺</span></td></tr>
+              <tr><td style="padding-left:28px" class="muted">↳ O1.1 引擎重构</td><td>王芳</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1"><i style="width:80%"></i></div><span class="pctlab">80%</span></div></td>
+                <td><span class="hdot ok"></span> on-track</td><td><span class="pill neutral">在途</span></td></tr>
+              <tr><td style="padding-left:28px" class="muted">↳ O1.2 多业务方接入</td><td>张伟</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar bad" style="flex:1"><i style="width:30%"></i></div><span class="pctlab">30%</span></div></td>
+                <td><span class="hdot bad"></span> off-track</td><td><span class="pill bad">回归风险 · SDK 阻塞</span></td></tr>
+              <tr><td><b>O2</b> 降本 40%</td><td>陈磊</td>
+                <td><div style="display:flex;align-items:center;gap:8px"><div class="bar" style="flex:1"><i style="width:72%"></i></div><span class="pctlab">72%</span></div></td>
+                <td><span class="hdot ok"></span> on-track</td><td><span class="pill ok">预计达标</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note" style="margin-top:16px">🔮 <b>后续（预留）</b>：O1 的「报价准确率」KR 可直接接 EddPlatform 评估通过率、O2 的「单次成本」可接真实 token 账，达成度就从「人工填」升级为「系统实测」。</div>
+      </section>
+
+      <!-- 业务线设置 -->
+      <section id="view-line-settings" hidden>
+        <h2 class="page">业务线设置 · <span id="lineTitleS">保险报价 Agent</span></h2>
+        <p class="sub">名称 / 负责人 / 默认 Jira 项目 / 达成度权重。</p>
+        <div class="card pad" style="max-width:520px">
+          <div class="field"><label>业务线名称</label><input type="text" value="保险报价 Agent" /></div>
+          <div class="field"><label>负责人</label><input type="text" value="李明" /></div>
+          <div class="field"><label>默认 Jira 项目 Key</label><input type="text" value="QUOTE" /></div>
+          <div class="field"><label>达成度权重（KR : 子目标）</label><input type="text" value="50 : 50" /></div>
+          <button class="btn primary" onclick="alert('原型占位：已保存')">保存</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ 模态：新建目标向导 ============ -->
+<div class="modal" id="wizard">
+  <div class="dialog">
+    <div class="dialog-h"><b>新建目标</b><span class="x" onclick="closeWizard()">×</span></div>
+    <div class="steps" id="wsteps">
+      <span class="s active">1 归属</span><span class="s">2 目标 & 周期</span><span class="s">3 关键结果</span><span class="s">4 阶段排期</span>
+    </div>
+    <div class="dialog-b">
+      <div class="wstep" data-step="1">
+        <div class="field"><label>业务线</label><select><option>保险报价 Agent</option><option>智能客服 Agent</option><option>理赔审核 Agent</option></select></div>
+        <div class="field"><label>父目标（选「无」= 顶层大目标；选某目标 = 作为其子目标）</label>
+          <select><option>无（顶层大目标）</option><option>O1 · 可规模化交付标品</option><option>O2 · 降本 40%</option></select></div>
+        <div class="hint">目标可递归拆解：大目标 → 子目标 → 更细子目标，层数不限。</div>
+      </div>
+      <div class="wstep" data-step="2" hidden>
+        <div class="field"><label>目标标题</label><input type="text" placeholder="如：把报价 Agent 做成可规模化交付的标品" /></div>
+        <div class="field"><label>负责人</label><input type="text" placeholder="李明" /></div>
+        <div class="row-flex">
+          <div class="field"><label>周期</label><select><option>2026 Q3</option><option>2026 Q4</option></select></div>
+          <div class="field"><label>时间窗口</label><input type="text" placeholder="07-01 ~ 09-30" /></div>
+        </div>
+      </div>
+      <div class="wstep" data-step="3" hidden>
+        <div class="note">KR 用「起始 → 目标」定义，当前值人工更新，进度自动算。</div>
+        <div class="field"><label>KR 1</label><input type="text" placeholder="报价准确率 88 → 95（%）" /></div>
+        <div class="field"><label>KR 2</label><input type="text" placeholder="平均报价时延 9 → 3（s）" /></div>
+        <a class="btn sm" onclick="alert('原型占位：再加一条 KR')">＋ 再加一条</a>
+      </div>
+      <div class="wstep" data-step="4" hidden>
+        <div class="note">每个目标自动带固定 5 阶段节点，为每阶段排「开始 ~ 结束」时间（可创建后再排 / 各自关联 Jira）。</div>
+        <div class="field"><label>① 业务需求确定 · 产出 业务流程图 + 建模图</label><input type="text" placeholder="07-01 ~ 07-08" /></div>
+        <div class="field"><label>② 方案确定 · 产出 方案 spec</label><input type="text" placeholder="07-08 ~ 07-15" /></div>
+        <div class="field"><label>③ 开发完成 · 产出 测试 spec</label><input type="text" placeholder="07-15 ~ 08-20" /></div>
+        <div class="row-flex">
+          <div class="field"><label>④ 测试</label><input type="text" placeholder="08-20 ~ 09-10" /></div>
+          <div class="field"><label>⑤ 发布上线</label><input type="text" placeholder="09-10 ~ 09-30" /></div>
+        </div>
+      </div>
+    </div>
+    <div class="dialog-f">
+      <button class="btn" id="wback" onclick="wnav(-1)" hidden>← 上一步</button>
+      <span style="flex:1"></span>
+      <button class="btn primary" id="wnext" onclick="wnav(1)">下一步 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 模态：更新达成度 ============ -->
+<div class="modal" id="updmodal">
+  <div class="dialog" style="width:520px">
+    <div class="dialog-h"><b>更新达成度</b><span class="x" onclick="closeUpdate()">×</span></div>
+    <div class="dialog-b">
+      <div class="note">人工更新为主：改 KR 当前值 → 目标达成度自动重算。</div>
+      <div class="field"><label>KR1 · 报价准确率（目标 95%）</label><input type="number" value="92" /></div>
+      <div class="field"><label>KR2 · 平均报价时延（目标 3s）</label><input type="number" value="5" /></div>
+      <div class="field"><label>KR3 · 接入业务方（目标 8 家）</label><input type="number" value="4" /></div>
+      <div class="field"><label>健康度（人工判断）</label>
+        <div class="segmented">
+          <button class="seg" onclick="pickSeg(this)">🟢 on-track</button>
+          <button class="seg active" onclick="pickSeg(this)">🟡 at-risk</button>
+          <button class="seg" onclick="pickSeg(this)">🔴 off-track</button>
+        </div></div>
+      <div class="field"><label>本周进展备注</label><textarea placeholder="引擎迁移过半；接入方进度受 SDK 阻塞…"></textarea></div>
+    </div>
+    <div class="dialog-f"><span style="flex:1"></span><button class="btn" onclick="closeUpdate()">取消</button><button class="btn primary" onclick="closeUpdate()">保存并重算</button></div>
+  </div>
+</div>
+
+<!-- ============ 模态：关联 Jira 执行 ============ -->
+<div class="modal" id="jiramodal">
+  <div class="dialog" style="width:520px">
+    <div class="dialog-h"><b>关联执行（Jira）</b><span class="x" onclick="closeJira()">×</span></div>
+    <div class="dialog-b">
+      <div class="field"><label>方式</label>
+        <div class="segmented" id="jseg">
+          <button class="seg active" onclick="jiraMode(this,'link')">关联已有</button>
+          <button class="seg" onclick="jiraMode(this,'push')">推送新建</button>
+        </div></div>
+      <div class="jmode" data-j="link">
+        <div class="field"><label>Jira Issue / Epic Key</label><input type="text" placeholder="QUOTE-1203" /></div>
+        <div class="hint">执行详情与状态以 Jira 为准；平台只存 Key + 跳转链接。</div>
+      </div>
+      <div class="jmode" data-j="push" hidden>
+        <div class="field"><label>项目</label><select><option>QUOTE</option><option>CS</option><option>CLAIM</option></select></div>
+        <div class="field"><label>标题</label><input type="text" placeholder="核心报价引擎迁移" /></div>
+        <div class="field"><label>类型</label><select><option>Epic</option><option>Story</option><option>Task</option></select></div>
+        <div class="hint">在 Jira 建 issue 后回填 Key & 链接。</div>
+      </div>
+    </div>
+    <div class="dialog-f"><span style="flex:1"></span><button class="btn" onclick="closeJira()">取消</button><button class="btn primary" onclick="closeJira()">确定关联</button></div>
+  </div>
+</div>
+
+<script>
+  // 两层导航：全局(global) / 业务线(line)
+  var gTitles={overview:'全局概览',lines:'业务线',cycles:'周期',settings:'设置 / 集成'};
+  var lTitles={'line-overview':'业务线概览',goals:'目标树',goal:'目标详情',roadmap:'交付流水线',review:'复盘','line-settings':'业务线设置'};
+  var curLine='保险报价 Agent', mode='global';
+
+  function setMode(m){
+    mode=m;
+    document.getElementById('nav-global').hidden=(m!=='global');
+    document.getElementById('nav-line').hidden=(m!=='line');
+    if(m==='global') go('overview');
+  }
+  function go(view){
+    document.querySelectorAll('section[id^=view-]').forEach(function(s){s.hidden=true});
+    var el=document.getElementById('view-'+view); if(el) el.hidden=false;
+    var navId=(mode==='line')?'#nav-line':'#nav-global';
+    document.querySelectorAll('.nav a').forEach(function(a){a.classList.remove('active')});
+    var link=document.querySelector(navId+' a[data-view="'+view+'"]'); if(link) link.classList.add('active');
+    document.getElementById('crumb').innerHTML = (mode==='line')
+      ? '全局 <span>/ '+curLine+' / '+(lTitles[view]||'')+'</span>'
+      : (gTitles[view]||'');
+    window.scrollTo(0,0);
+  }
+  document.querySelectorAll('.nav a[data-view]').forEach(function(a){a.onclick=function(){go(a.dataset.view)}});
+
+  // 全局 → 业务线
+  function openLine(name){
+    curLine=name;
+    var a=document.getElementById('linePick'); if(a) a.textContent=name;
+    ['lineTitleO','lineTitleS'].forEach(function(id){var e=document.getElementById(id); if(e) e.textContent=name;});
+    setMode('line'); go('line-overview');
+  }
+
+  // ===== 固定 5 阶段节点（大 / 小目标通用）=====
+  // [阶段名, 产出物]
+  var STAGES=[
+    ['业务需求确定','业务流程图 + 建模图'],
+    ['方案确定','方案 spec'],
+    ['开发完成','测试 spec'],
+    ['测试','测试报告'],
+    ['发布上线','上线（release note）']
+  ];
+
+  // ===== 目标数据模型（原型内存态）=====
+  // kr:[标题,当前值文案,进度%,健康]
+  // st: 与 STAGES 一一对应的 5 个节点 [状态, 开始, 结束, Jira]  状态∈done/run/blocked/todo
+  var GOALS={
+    'O1':{code:'O1 · 大目标',name:'把报价 Agent 做成可规模化交付的标品',owner:'李明',cycle:'2026 Q3',win:'07-01 ~ 09-30',health:'warn',prog:58,leaf:false,
+      kr:[['KR1 · 报价准确率 88% → 95%','当前 92%',67,'ok'],['KR2 · 平均报价时延 9s → 3s','当前 5s',67,'ok'],['KR3 · 接入业务方 2 → 8 家','当前 4 家',33,'bad']],
+      st:[['done','07-01','07-08',''],['done','07-08','07-15',''],['run','07-15','08-20','QUOTE-1203'],['todo','08-20','09-10',''],['todo','09-10','09-30','']],
+      children:['O1.1','O1.2'],rollup:[['3 项 KR 均值',56],['子目标 O1.1',80],['子目标 O1.2',30]]},
+    'O2':{code:'O2 · 大目标',name:'降本：单次报价 LLM 成本下降 40%',owner:'陈磊',cycle:'2026 Q3',win:'07-01 ~ 09-30',health:'ok',prog:72,leaf:false,
+      kr:[['KR1 · 缓存命中率 30% → 80%','当前 68%',76,'ok'],['KR2 · 单次成本 ¥0.12 → ¥0.07','当前 ¥0.085',70,'ok']],
+      st:[['done','07-01','07-06',''],['done','07-06','07-12',''],['run','07-12','08-25',''],['todo','08-25','09-15',''],['todo','09-15','09-30','']],
+      children:['O2.1'],rollup:[['2 项 KR 均值',73],['子目标 O2.1',70]]},
+    'O1.1':{code:'子目标',name:'O1.1 报价引擎重构（可维护 / 可扩展）',owner:'王芳',cycle:'2026 Q3',win:'07-01 ~ 08-20',health:'ok',prog:80,leaf:true,
+      kr:[['KR · 单测覆盖率 60% → 90%','当前 84%',80,'ok']],
+      st:[['done','07-01','07-04',''],['done','07-04','07-08',''],['run','07-08','07-30','QUOTE-1203'],['todo','07-30','08-12',''],['todo','08-12','08-20','']],children:[]},
+    'O1.2':{code:'子目标',name:'O1.2 多业务方接入（SDK + SOP）',owner:'张伟',cycle:'2026 Q3',win:'07-10 ~ 09-25',health:'bad',prog:30,leaf:true,
+      kr:[['KR1 · 接入文档完成度 0 → 100%','当前 40%',40,'warn'],['KR2 · 接入 SDK 就绪 0 → 1','当前 0',0,'bad']],
+      st:[['done','07-10','07-15',''],['blocked','07-15','07-22','QUOTE-1250'],['todo','07-22','08-30',''],['todo','08-30','09-15',''],['todo','09-15','09-25','']],children:[]},
+    'O2.1':{code:'子目标',name:'O2.1 Prompt 瘦身 + 缓存策略',owner:'陈磊',cycle:'2026 Q3',win:'07-05 ~ 09-10',health:'ok',prog:70,leaf:true,
+      kr:[['KR · Prompt token 数下降 0 → 40%','当前 28%',70,'ok']],
+      st:[['done','07-05','07-09',''],['done','07-09','07-14',''],['run','07-14','08-15',''],['todo','08-15','08-30',''],['todo','08-30','09-10','']],children:[]}
+  };
+  var HN={ok:'on-track',warn:'at-risk',bad:'off-track'};
+  function hDot(h){return '<span class="hdot '+h+'"></span>';}
+  function barCls(h){return h==='bad'?' bad':(h==='warn'?' warn':'');}
+  function stPill(s){var m={done:['ok','● 已完成'],run:['run','● 进行中'],blocked:['bad','● 阻塞'],todo:['neutral','待开始']},x=m[s]||m.todo;return '<span class="pill '+x[0]+'">'+x[1]+'</span>';}
+  function stExt(e){if(e[3])return '<span class="mono muted">'+e[3]+' ↗</span>';if(e[0]==='done')return '<span class="mono muted">产出物 ↗</span>';return '<span class="muted">—</span>';}
+  function curStage(st){for(var i=0;i<st.length;i++){if(st[i][0]==='run'||st[i][0]==='blocked')return i;}var d=0;st.forEach(function(s){if(s[0]==='done')d++;});return d>=st.length?st.length-1:d;}
+  function pipeHtml(st){return STAGES.map(function(s,i){return '<div class="step '+st[i][0]+'"><span class="n">'+(i+1)+'</span>'+s[0]+'</div>';}).join('<span class="arr">→</span>');}
+
+  // 渲染目标详情：先「① 进度执行」（达成度 + KR + 5 阶段节点），后「② 子目标」
+  function renderGoal(id){
+    var g=GOALS[id]; if(!g) return '<p class="muted">未找到目标 '+id+'</p>';
+    var krRows=g.kr.map(function(k){
+      return '<div class="kr"><span class="knm">'+k[0]+'</span><div class="kbar"><div class="bar sm'+barCls(k[3])+'"><i style="width:'+k[2]+'%"></i></div></div><span class="kval">'+k[1]+' · '+k[2]+'%</span></div>';
+    }).join('');
+    var rollup = g.leaf ? g.kr.map(function(k){return [k[0].replace(/^KR[0-9]* · /,''),k[2]];}) : g.rollup;
+    var rollupRows = rollup.map(function(r){return '<span>'+r[0]+'</span><span class="pctlab">'+r[1]+'%</span>';}).join('');
+    var achNote = g.leaf ? '叶子目标 · 人工填写（参考下列 KR）' : '自动汇总子目标 + KR（不落库，实时算）';
+    var ci=curStage(g.st), curLabel=STAGES[ci][0]+'（'+(ci+1)+'/5）';
+    var stRows=STAGES.map(function(s,i){var e=g.st[i];
+      return '<tr><td><b>'+(i+1)+'. '+s[0]+'</b></td><td class="muted">'+s[1]+'</td><td class="mono">'+e[1]+' ~ '+e[2]+'</td><td>'+stPill(e[0])+'</td><td>'+stExt(e)+'</td></tr>';
+    }).join('');
+    var subSec;
+    if(g.children&&g.children.length){
+      var rows=g.children.map(function(cid){var c=GOALS[cid];
+        return '<div class="grow" onclick="openGoal(\''+cid+'\')"><span class="chev leaf">▾</span><div class="gmain"><div class="gtitle"><span class="lv sub">子目标</span> '+c.name+'</div><div class="gmeta"><span>👤 '+c.owner+'</span><span>📅 '+c.win+'</span><span>'+hDot(c.health)+' '+HN[c.health]+'</span></div></div><div class="gprog"><span class="pctlab">'+c.prog+'%</span><div class="bar'+barCls(c.health)+'"><i style="width:'+c.prog+'%"></i></div></div></div>';
+      }).join('');
+      subSec='<div class="section-title"><h3>② 子目标 <span class="muted">('+g.children.length+')</span></h3><button class="btn sm" onclick="openWizard()">＋ 加子目标</button></div><div class="tree">'+rows+'</div>';
+    }else{
+      subSec='<div class="section-title"><h3>② 子目标</h3></div><div class="note">🍃 叶子目标，无子目标。进度由上方 KR 与 5 阶段节点直接衡量、人工确认。</div>';
+    }
+    return ''
+      +'<h2 class="page"><span class="lv" style="font-size:12px;vertical-align:middle">'+g.code+'</span> '+g.name+'</h2>'
+      +'<p class="sub">'+hDot(g.health)+' <span class="htext '+g.health+'">'+HN[g.health]+'</span> · 👤 '+g.owner+' · <span class="tag cyc">'+g.cycle+'</span> · 📅 '+g.win+'</p>'
+      +'<div class="filterbar" style="margin-top:0"><button class="btn primary sm" onclick="openUpdate()">✏️ 更新达成度</button><button class="btn sm" onclick="openJira()">🔗 关联执行（Jira）</button></div>'
+      +'<div class="section-title"><h3>① 进度执行 <span class="muted" style="font-weight:500">· 当前阶段：'+curLabel+'</span></h3></div>'
+      +'<div class="row-flex" style="align-items:flex-start">'
+        +'<div class="card pad" style="flex:1"><h3 style="margin:0 0 10px">达成度</h3><div style="text-align:center;padding:6px 0 12px"><div style="font-size:38px;font-weight:800">'+g.prog+'%</div><div class="muted" style="font-size:12px">'+achNote+'</div></div><div class="kv" style="grid-template-columns:1fr auto;gap:6px 10px">'+rollupRows+'</div></div>'
+        +'<div class="card pad" style="flex:1.5"><h3 style="margin:0 0 10px">关键结果（KR）· 人工更新</h3>'+krRows+'</div>'
+      +'</div>'
+      +'<div class="card pad" style="margin-top:16px"><h3 style="margin:0 0 10px">交付阶段（固定 5 节点）</h3><div class="pipe">'+pipeHtml(g.st)+'</div></div>'
+      +'<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>阶段节点</th><th>产出物</th><th>计划起止</th><th>状态</th><th>关联执行</th></tr></thead><tbody>'+stRows+'</tbody></table></div>'
+      +subSec;
+  }
+  function openGoal(id){
+    if(mode!=='line') setMode('line');
+    document.getElementById('goalDetail').innerHTML=renderGoal(id);
+    go('goal');
+  }
+
+  // 交付流水线总览：每个目标一行，显示其固定 5 阶段的当前状态
+  function renderRoadmap(){
+    var order=['O1','O1.1','O1.2','O2','O2.1'];
+    var html=order.map(function(id){var g=GOALS[id],ci=curStage(g.st);
+      var lv=g.leaf?'<span class="lv sub">子目标</span>':'<span class="lv">'+g.code.split(' ')[0]+' 大目标</span>';
+      return '<div class="grow" onclick="openGoal(\''+id+'\')"><div class="gmain"><div class="gtitle">'+lv+' '+g.name+' <span class="muted" style="font-weight:500;font-size:12px">· 👤 '+g.owner+'</span></div><div class="pipe">'+pipeHtml(g.st)+'</div></div><div class="gprog"><span class="pctlab">'+g.prog+'%</span><div class="muted" style="font-size:11px;margin-top:4px">'+STAGES[ci][0]+'</div></div></div>';
+    }).join('');
+    var el=document.getElementById('roadmapBoard'); if(el) el.innerHTML='<div class="tree">'+html+'</div>';
+  }
+  renderRoadmap();
+
+  // 目标树：展开 / 收起
+  function toggleTree(ev,path){
+    ev.stopPropagation();
+    var chev=ev.currentTarget; chev.classList.toggle('col');
+    var collapsed=chev.classList.contains('col');
+    document.querySelectorAll('[data-path^="'+path+'/"]').forEach(function(r){r.hidden=collapsed});
+    var kb=document.querySelector('.krbox[data-krof="'+path+'"]'); if(kb) kb.hidden=collapsed;
+  }
+  // 目标树：按健康过滤
+  function filterGoals(chip,h){
+    document.querySelectorAll('#view-goals .chip').forEach(function(c){c.classList.remove('active')}); chip.classList.add('active');
+    document.querySelectorAll('#goalTree .grow[data-h]').forEach(function(r){
+      var show=(h==='all')||(r.dataset.h===h); r.hidden=!show;
+      var kb=document.querySelector('.krbox[data-krof="'+r.dataset.path+'"]'); if(kb) kb.hidden=!show;
+    });
+  }
+
+  // 周期切换
+  function onCycle(){
+    var v=document.getElementById('cycleSel').value.replace('2026','2026 ');
+    var e=document.getElementById('ovCycle'); if(e) e.textContent=v;
+  }
+
+  // 弹窗
+  function pickSeg(el){el.parentNode.querySelectorAll('.seg').forEach(function(s){s.classList.remove('active')});el.classList.add('active');}
+  function openUpdate(){document.getElementById('updmodal').classList.add('open')}
+  function closeUpdate(){document.getElementById('updmodal').classList.remove('open')}
+  function openJira(){document.getElementById('jiramodal').classList.add('open'); jiraMode(document.querySelector('#jseg .seg'),'link');}
+  function closeJira(){document.getElementById('jiramodal').classList.remove('open')}
+  function jiraMode(el,j){
+    document.querySelectorAll('#jseg .seg').forEach(function(s){s.classList.remove('active')}); el.classList.add('active');
+    document.querySelectorAll('#jiramodal .jmode').forEach(function(p){p.hidden=p.dataset.j!==j});
+  }
+
+  // 新建目标向导
+  var step=1;
+  function openWizard(){step=1;renderStep();document.getElementById('wizard').classList.add('open')}
+  function closeWizard(){document.getElementById('wizard').classList.remove('open')}
+  function renderStep(){
+    document.querySelectorAll('.wstep').forEach(function(s){s.hidden=(+s.dataset.step!==step)});
+    document.querySelectorAll('#wsteps .s').forEach(function(s,i){s.classList.toggle('active',i+1===step);s.classList.toggle('done',i+1<step)});
+    document.getElementById('wback').hidden = step===1;
+    document.getElementById('wnext').textContent = step===4 ? '✅ 创建目标' : '下一步 →';
+  }
+  function wnav(d){
+    if(step===4 && d===1){ closeWizard(); go('goals'); return; }
+    step=Math.max(1,Math.min(4,step+d)); renderStep();
+  }
+
+  go('overview'); // 初始进入全局层
+</script>
+</body>
+</html>
