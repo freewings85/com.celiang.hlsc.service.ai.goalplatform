@@ -40,20 +40,35 @@ API 文档见 **http://127.0.0.1:8000/docs**。首次启动自动建库并播种
 - ✅ 业务线 / 周期 / 目标（递归树）/ KR / 固定 5 阶段计划 —— 全链路 CRUD + 持久化
 - ✅ 目标树展开、健康度过滤、按周期切换；目标详情里改 KR、逐阶段排期与关联 Jira Key、加/删子目标（级联删除）
 - ❌ **不做任何达成度 / 百分比计算与自动汇总**（健康度、阶段状态改为人工设置）
-- ➖ Jira / EddPlatform 仅存 Key、留接口，未真正对接
+
+## Jira 联动 + 账户体系
+
+- **每个目标 = 一个 Jira issue**（一对一）。目标树父子关系权威存本平台；同步时若父目标已同步，则在 Jira 侧建一条 `Relates` link 弱表达（因 Jira 原生三层封顶、子任务不能嵌套，不强求它表达无限层级树）。
+- **建目标时「同步到 Jira」开关，默认开**：开=自动在该业务线的 Jira 项目下建 issue、回填 key/链接；关=事后可「立即同步」或「关联已有 issue」。同步失败不影响目标创建（提示可重试）。
+- **账户**：平台有用户，顶栏可切「当前用户」；每人在「用户 / 集成」页绑各自 Jira 邮箱 + **API Token（Fernet 加密存、永不回显）**，「测连接」通过后回填 accountId。同步用当前用户的凭据鉴权，issue 指派给目标负责人。
+- **真集成、可切换**：`jira_client.py` 按 Jira Cloud REST API v3 实现。设置里填 **Jira 站点 URL** 即生效；换真站点只改这一个 URL，代码不动。
+- **本地验证**：`backend/jira_mock.py` 是忠实还原 Jira REST 接口的 mock，用于无真站点时端到端跑通：
+  ```bash
+  cd backend && .venv/bin/uvicorn jira_mock:app --port 8099   # 另开一个终端
+  # 然后在「用户/集成」页把站点 URL 填 http://127.0.0.1:8099，给某用户设个任意 Token 即可演示
+  ```
 
 ## 技术栈
 
-- 后端：**Python / FastAPI + SQLModel + SQLite**（`backend/`）
+- 后端：**Python / FastAPI + SQLModel + SQLite + httpx + cryptography**（`backend/`）
 - 前端：**单文件原生 SPA**（`frontend/index.html`，复用原型设计，直连 API；本版从简，未上 React/Vite）
 - `prototype/index.html` 为最初的静态高保真原型，保留作设计参照。
 
 ## 目录
 
 ```
-backend/    FastAPI 服务：models / schemas / db(种子) / serializers / routers(business_lines,cycles,goals)
+backend/    FastAPI 服务
+  models / schemas / serializers / security(Token加密) / db(种子)
+  jira_client(真v3) / jira_config / jira_mock(验证用) / deps(当前用户)
+  routers/  business_lines · cycles · goals(含 Jira 同步/关联) · users · settings
 frontend/   功能版 SPA（同源托管）
 prototype/  最初的静态原型
+docs/       设计文档（specs）
 run.sh      一键启动
 ```
 

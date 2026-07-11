@@ -3,7 +3,20 @@ from __future__ import annotations
 
 from sqlmodel import Session, select
 
-from models import Goal, KeyResult, Stage
+from models import Goal, KeyResult, Stage, User
+
+
+def user_dict(u: User) -> dict:
+    """绝不返回 token；只回是否已配置。"""
+    return {
+        "id": u.id,
+        "name": u.name,
+        "email": u.email,
+        "jira_email": u.jira_email,
+        "jira_account_id": u.jira_account_id,
+        "has_jira_token": bool(u.jira_token_enc),
+        "is_active": u.is_active,
+    }
 
 
 def stage_dict(st: Stage) -> dict:
@@ -47,10 +60,13 @@ def goal_dict(goal: Goal, session: Session, *, with_children: bool = False) -> d
         "parent_id": goal.parent_id,
         "title": goal.title,
         "owner": goal.owner,
+        "owner_user_id": goal.owner_user_id,
         "health": goal.health,
         "start_date": goal.start_date,
         "end_date": goal.end_date,
         "sort_order": goal.sort_order,
+        "jira_key": goal.jira_key,
+        "jira_url": goal.jira_url,
         "child_ids": list(child_ids),
         "krs": [kr_dict(k) for k in krs],
         "stages": [stage_dict(s) for s in stages],

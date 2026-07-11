@@ -16,6 +16,7 @@ from models import (
     KeyResult,
     Stage,
     StageStatus,
+    User,
 )
 
 DB_PATH = Path(__file__).parent / "goalplatform.db"
@@ -67,6 +68,13 @@ def init_db() -> None:
 
 def _seed(s: Session) -> None:
     """从原型的示例数据播种一份可玩的初始库。"""
+    # 用户（各自将来绑自己的 Jira 身份；此处不带 token）
+    names = ["李明", "陈磊", "王芳", "张伟", "周琳", "吴涛"]
+    for n in names:
+        s.add(User(name=n, jira_email=""))
+    s.commit()
+    user_id = {u.name: u.id for u in s.exec(select(User)).all()}
+
     # 周期
     q3 = Cycle(name="2026 Q3", start_date=date(2026, 7, 1), end_date=date(2026, 9, 30), status=CycleStatus.active)
     q2 = Cycle(name="2026 Q2", start_date=date(2026, 4, 1), end_date=date(2026, 6, 30), status=CycleStatus.archived)
@@ -89,8 +97,8 @@ def _seed(s: Session) -> None:
             end = date.fromisoformat(f"2026-{b}")
         g = Goal(
             business_line_id=bl_id, cycle_id=cycle_id, parent_id=parent_id,
-            title=title, owner=owner, health=Health(health),
-            start_date=start, end_date=end, sort_order=order,
+            title=title, owner=owner, owner_user_id=user_id.get(owner),
+            health=Health(health), start_date=start, end_date=end, sort_order=order,
         )
         s.add(g)
         s.commit()

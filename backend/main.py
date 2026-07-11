@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from db import init_db
-from routers import business_lines, cycles, goals
+from routers import business_lines, cycles, goals, settings, users
 
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
@@ -40,6 +40,8 @@ app.add_middleware(
 app.include_router(business_lines.router)
 app.include_router(cycles.router)
 app.include_router(goals.router)
+app.include_router(users.router)
+app.include_router(settings.router)
 
 
 @app.get("/api/health")

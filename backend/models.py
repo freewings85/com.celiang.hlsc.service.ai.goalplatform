@@ -66,6 +66,26 @@ class Cycle(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class User(SQLModel, table=True):
+    """平台用户：每人绑各自的 Jira 身份。Token 加密存，只写不读。"""
+    __tablename__ = "user"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    email: str = ""
+    jira_email: str = ""                        # 该用户在 Jira 的登录邮箱
+    jira_account_id: str = ""                   # Jira accountId（测连接时回填，用于指派）
+    jira_token_enc: str = ""                    # Fernet 密文；空 = 未配置
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AppSetting(SQLModel, table=True):
+    """全局键值配置。当前只用 key='jira_base_url'（单一 Jira 站点）。"""
+    __tablename__ = "app_setting"
+    key: str = Field(primary_key=True)
+    value: str = ""
+
+
 class Goal(SQLModel, table=True):
     """目标：递归成树（大目标 → 子目标，层数不限）。"""
     __tablename__ = "goal"
@@ -75,10 +95,15 @@ class Goal(SQLModel, table=True):
     parent_id: Optional[int] = Field(default=None, foreign_key="goal.id", index=True)
     title: str
     owner: str = ""
+    owner_user_id: Optional[int] = Field(default=None, foreign_key="user.id", index=True)
     health: Health = Health.on_track           # 人工判断
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     sort_order: int = 0
+    # 该目标对应的 Jira issue（每个目标 = 1 个 issue）
+    jira_key: str = ""
+    jira_id: str = ""
+    jira_url: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

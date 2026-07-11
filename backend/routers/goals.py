@@ -7,11 +7,56 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from db import get_session, make_stages
-from models import Goal, KeyResult, Stage
-from schemas import GoalIn, GoalUpdate, KRIn, KRUpdate, StageUpdate
+from deps import current_user
+from jira_client import JiraError, add_link, create_issue, get_issue
+from jira_config import auth_for_user
+from models import BusinessLine, Goal, KeyResult, Stage, User
+from schemas import GoalIn, GoalUpdate, JiraLinkIn, KRIn, KRUpdate, StageUpdate
 from serializers import goal_dict, kr_dict, stage_dict
 
 router = APIRouter(prefix="/api", tags=["goals"])
+
+
+def _sync_goal_to_jira(session: Session, goal: Goal, user: User | None) -> str | None:
+    """把目标同步成一个 Jira issue。成功回填 goal.jira_*；失败返回错误文案（不抛）。"""
+    auth = auth_for_user(session, user)
+    if not auth.base_url:
+        return "尚未配置 Jira 站点（去「用户 / 集成」设置里填）"
+    if not auth.ok:
+        return "当前用户还没配 Jira 邮箱 / Token"
+    bl = session.get(BusinessLine, goal.business_line_id)
+    project_key = bl.jira_project_key if bl else ""
+    if not project_key:
+        return "该业务线没设默认 Jira 项目 Key"
+
+    # 指派给目标负责人（若其是已知用户且测过连接拿到 accountId）
+    assignee = None
+    if goal.owner_user_id:
+        ow = session.get(User, goal.owner_user_id)
+        if ow and ow.jira_account_id:
+            assignee = ow.jira_account_id
+
+    try:
+        issue = create_issue(auth, project_key, goal.title, f"GoalPlatform 目标 · 负责人 {goal.owner or '—'}", assignee_account_id=assignee)
+    except JiraError as e:
+        return f"建 Jira issue 失败：{e.message}"
+    except Exception as e:
+        return f"建 Jira issue 失败：{e}"
+
+    goal.jira_key, goal.jira_id, goal.jira_url = issue["key"], issue["id"], issue["url"]
+    session.add(goal)
+    session.commit()
+    session.refresh(goal)
+
+    # 父目标若已同步，建一条弱关联（尽力而为，失败不影响主流程）
+    if goal.parent_id:
+        parent = session.get(Goal, goal.parent_id)
+        if parent and parent.jira_key:
+            try:
+                add_link(auth, parent.jira_key, goal.jira_key)
+            except Exception:
+                pass
+    return None
 
 
 # ============ 目标 ============
@@ -40,7 +85,7 @@ def get_goal(goal_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/goals", status_code=201)
-def create_goal(payload: GoalIn, session: Session = Depends(get_session)):
+def create_goal(payload: GoalIn, session: Session = Depends(get_session), user: User | None = Depends(current_user)):
     if payload.parent_id is not None and not session.get(Goal, payload.parent_id):
         raise HTTPException(400, "父目标不存在")
     g = Goal(
@@ -49,6 +94,7 @@ def create_goal(payload: GoalIn, session: Session = Depends(get_session)):
         parent_id=payload.parent_id,
         title=payload.title,
         owner=payload.owner,
+        owner_user_id=payload.owner_user_id,
         health=payload.health,
         start_date=payload.start_date,
         end_date=payload.end_date,
@@ -74,7 +120,13 @@ def create_goal(payload: GoalIn, session: Session = Depends(get_session)):
     session.add_all(stages)
     session.commit()
     session.refresh(g)
-    return goal_dict(g, session, with_children=True)
+
+    # 建目标即同步到 Jira（默认开）。失败不影响目标创建，只在响应里带 jira_error。
+    jira_error = _sync_goal_to_jira(session, g, user) if payload.sync_to_jira else None
+    out = goal_dict(g, session, with_children=True)
+    if jira_error:
+        out["jira_error"] = jira_error
+    return out
 
 
 @router.patch("/goals/{goal_id}")
@@ -174,3 +226,59 @@ def update_stage(stage_id: int, payload: StageUpdate, session: Session = Depends
     session.commit()
     session.refresh(st)
     return stage_dict(st)
+
+
+# ============ 目标 ↔ Jira ============
+@router.post("/goals/{goal_id}/jira/sync")
+def jira_sync(goal_id: int, session: Session = Depends(get_session), user: User | None = Depends(current_user)):
+    """事后把目标同步成 Jira issue（若已关联则报错，避免重复建）。"""
+    g = session.get(Goal, goal_id)
+    if not g:
+        raise HTTPException(404, "目标不存在")
+    if g.jira_key:
+        raise HTTPException(400, f"该目标已关联 {g.jira_key}，请先解除再同步")
+    err = _sync_goal_to_jira(session, g, user)
+    if err:
+        raise HTTPException(502, err)
+    return goal_dict(g, session, with_children=True)
+
+
+@router.post("/goals/{goal_id}/jira/link")
+def jira_link(goal_id: int, payload: JiraLinkIn, session: Session = Depends(get_session), user: User | None = Depends(current_user)):
+    """手动关联一个已有的 Jira issue（会校验其存在）。"""
+    g = session.get(Goal, goal_id)
+    if not g:
+        raise HTTPException(404, "目标不存在")
+    auth = auth_for_user(session, user)
+    key = payload.key.strip()
+    if not key:
+        raise HTTPException(400, "请填 Jira issue key")
+    if auth.ok and auth.base_url:
+        try:
+            issue = get_issue(auth, key)
+            g.jira_key, g.jira_id, g.jira_url = issue["key"], issue["id"], issue["url"]
+        except JiraError as e:
+            raise HTTPException(404 if e.status == 404 else 502, f"校验 Jira issue 失败：{e.message}")
+        except Exception as e:
+            raise HTTPException(502, f"校验 Jira issue 失败：{e}")
+    else:
+        # 未配置凭据时也允许弱关联（只存 key，url 按站点拼；无站点则留空）
+        g.jira_key = key
+        g.jira_url = f"{auth.base_url.rstrip('/')}/browse/{key}" if auth.base_url else ""
+    session.add(g)
+    session.commit()
+    session.refresh(g)
+    return goal_dict(g, session, with_children=True)
+
+
+@router.delete("/goals/{goal_id}/jira/link")
+def jira_unlink(goal_id: int, session: Session = Depends(get_session)):
+    """解除关联（只清平台侧字段，不动 Jira 里的 issue）。"""
+    g = session.get(Goal, goal_id)
+    if not g:
+        raise HTTPException(404, "目标不存在")
+    g.jira_key = g.jira_id = g.jira_url = ""
+    session.add(g)
+    session.commit()
+    session.refresh(g)
+    return goal_dict(g, session, with_children=True)

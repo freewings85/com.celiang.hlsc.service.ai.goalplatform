@@ -74,19 +74,49 @@ class GoalIn(SQLModel):
     parent_id: Optional[int] = None
     title: str
     owner: str = ""
+    owner_user_id: Optional[int] = None
     health: Health = Health.on_track
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     krs: list[KRIn] = []
     stages: list[StageIn] = []          # 可选，按位置排期；缺省则 5 个 todo
+    sync_to_jira: bool = True           # 默认建目标即同步到 Jira
 
 
 class GoalUpdate(SQLModel):
     title: Optional[str] = None
     owner: Optional[str] = None
+    owner_user_id: Optional[int] = None
     health: Optional[Health] = None
     cycle_id: Optional[int] = None
     parent_id: Optional[int] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     sort_order: Optional[int] = None
+
+
+# ---- 用户 ----
+class UserIn(SQLModel):
+    name: str
+    email: str = ""
+    jira_email: str = ""
+
+
+class UserUpdate(SQLModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    jira_email: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class JiraTokenIn(SQLModel):
+    token: str = ""                     # 空字符串 = 清除 token
+
+
+# ---- 设置 / Jira 关联 ----
+class JiraSettingIn(SQLModel):
+    jira_base_url: str = ""
+
+
+class JiraLinkIn(SQLModel):
+    key: str                            # 已有 Jira issue key，如 QUOTE-1203
