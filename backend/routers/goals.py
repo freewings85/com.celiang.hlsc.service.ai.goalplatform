@@ -8,8 +8,8 @@ from sqlmodel import Session, select
 
 from db import get_session, make_stages
 from deps import current_user
-from jira_client import JiraError, add_link, create_issue, get_issue
-from jira_config import auth_for_user
+from jira_client import JiraError, add_link, assign_issue, create_issue, get_issue
+from jira_config import LINK_TYPE, auth_for_user, jira_issue_type
 from models import BusinessLine, Goal, KeyResult, Stage, User
 from schemas import GoalIn, GoalUpdate, JiraLinkIn, KRIn, KRUpdate, StageUpdate
 from serializers import goal_dict, kr_dict, stage_dict
@@ -21,21 +21,18 @@ def _sync_goal_to_jira(session: Session, goal: Goal, user: User | None) -> str |
     """把目标同步成一个 Jira issue。成功回填 goal.jira_*；失败返回错误文案（不抛）。"""
     auth = auth_for_user(session, user)
     if not auth.ok:
-        return "当前用户未用 Jira 账号登录（或授权已失效），无法同步"
+        return "当前用户未用 Jira 账号登录，无法同步"
     bl = session.get(BusinessLine, goal.business_line_id)
     project_key = bl.jira_project_key if bl else ""
     if not project_key:
         return "该业务线没设默认 Jira 项目 Key"
 
-    # 指派给目标负责人（若其已用 Jira 登录、有 accountId）
-    assignee = None
-    if goal.owner_user_id:
-        ow = session.get(User, goal.owner_user_id)
-        if ow and ow.atlassian_account_id:
-            assignee = ow.atlassian_account_id
-
     try:
-        issue = create_issue(auth, project_key, goal.title, f"GoalPlatform 目标 · 负责人 {goal.owner or '—'}", assignee_account_id=assignee)
+        issue = create_issue(
+            auth, project_key, goal.title,
+            f"GoalPlatform 目标 · 负责人 {goal.owner or '—'}",
+            issue_type=jira_issue_type(session),
+        )
     except JiraError as e:
         return f"建 Jira issue 失败：{e.message}"
     except Exception as e:
@@ -46,12 +43,21 @@ def _sync_goal_to_jira(session: Session, goal: Goal, user: User | None) -> str |
     session.commit()
     session.refresh(goal)
 
+    # 指派给目标负责人（若其也用 Jira 登录过、有用户名）——尽力而为，失败不影响
+    if goal.owner_user_id:
+        ow = session.get(User, goal.owner_user_id)
+        if ow and ow.jira_username:
+            try:
+                assign_issue(auth, goal.jira_key, ow.jira_username)
+            except Exception:
+                pass
+
     # 父目标若已同步，建一条弱关联（尽力而为，失败不影响主流程）
     if goal.parent_id:
         parent = session.get(Goal, goal.parent_id)
         if parent and parent.jira_key:
             try:
-                add_link(auth, parent.jira_key, goal.jira_key)
+                add_link(auth, parent.jira_key, goal.jira_key, LINK_TYPE)
             except Exception:
                 pass
     return None

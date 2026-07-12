@@ -1,4 +1,4 @@
-"""设置读写 + 用「当前登录用户的 OAuth 令牌」构造 Jira 调用所需的 JiraAuth。"""
+"""设置读写 + 用「当前登录用户的 Jira 用户名/密码」构造 JiraAuth。"""
 from __future__ import annotations
 
 from typing import Optional
@@ -7,10 +7,15 @@ from sqlmodel import Session
 
 from models import AppSetting, User
 
+# 默认站点（可在「用户 / 集成」页改）。指向自建 Jira Server。
+DEFAULT_BASE_URL = "http://192.168.100.130:18080"
+DEFAULT_ISSUE_TYPE = "任务"
+LINK_TYPE = "Relates"
+
 
 def get_setting(session: Session, key: str, default: str = "") -> str:
     row = session.get(AppSetting, key)
-    return row.value if row else default
+    return row.value if row and row.value else default
 
 
 def set_setting(session: Session, key: str, value: str) -> None:
@@ -23,17 +28,24 @@ def set_setting(session: Session, key: str, value: str) -> None:
     session.commit()
 
 
-def auth_for_user(session: Session, user: Optional[User]):
-    """OAuth：Jira API 走 {api_base}/ex/jira/{cloudid}，Bearer=用户 access token（自动续期）。"""
-    # 延迟导入避免循环
-    from jira_client import JiraAuth
-    from oauth import get_config, valid_access_token
+def jira_base_url(session: Session) -> str:
+    return get_setting(session, "jira_base_url", DEFAULT_BASE_URL).rstrip("/")
 
-    if not user or not user.oauth_cloud_id:
-        return JiraAuth(base_url="", token="")
-    token = valid_access_token(session, user)
-    if not token:
-        return JiraAuth(base_url="", token="")
-    api_base = get_config(session).api_base.rstrip("/")
-    base = f"{api_base}/ex/jira/{user.oauth_cloud_id}"
-    return JiraAuth(base_url=base, token=token, site_url=user.oauth_site_url)
+
+def jira_issue_type(session: Session) -> str:
+    return get_setting(session, "jira_issue_type", DEFAULT_ISSUE_TYPE)
+
+
+def auth_for_user(session: Session, user: Optional[User]):
+    """Jira Server：Basic auth = 站点 + 该用户登录时存下的用户名/密码。"""
+    from jira_client import JiraAuth
+    from security import decrypt
+
+    base = jira_base_url(session)
+    if not user or not user.jira_username or not user.jira_password_enc:
+        return JiraAuth(base_url="", username="", password="")
+    try:
+        pw = decrypt(user.jira_password_enc)
+    except Exception:
+        return JiraAuth(base_url="", username="", password="")
+    return JiraAuth(base_url=base, username=user.jira_username, password=pw)

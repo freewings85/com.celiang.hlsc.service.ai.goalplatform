@@ -8,6 +8,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from models import (
     FIXED_STAGES,
+    AppSetting,
     BusinessLine,
     Cycle,
     CycleStatus,
@@ -18,6 +19,7 @@ from models import (
     StageStatus,
     User,
 )
+from jira_config import DEFAULT_BASE_URL, DEFAULT_ISSUE_TYPE
 
 DB_PATH = Path(__file__).parent / "goalplatform.db"
 engine = create_engine(
@@ -68,7 +70,11 @@ def init_db() -> None:
 
 def _seed(s: Session) -> None:
     """从原型的示例数据播种一份可玩的初始库。"""
-    # 用户：身份将来由「用 Jira 登录」按 email 接上（本地 mock 用同样的 email 登录）
+    # 全局设置：Jira 站点 + 建 issue 类型（登录、同步都用它）
+    s.add(AppSetting(key="jira_base_url", value=DEFAULT_BASE_URL))
+    s.add(AppSetting(key="jira_issue_type", value=DEFAULT_ISSUE_TYPE))
+
+    # 示例用户（演示负责人用）。真身份由「用 Jira 账号登录」时创建/认领。
     seed_users = [("李明", "liming"), ("陈磊", "chenlei"), ("王芳", "wangfang"),
                   ("张伟", "zhangwei"), ("周琳", "zhoulin"), ("吴涛", "wutao")]
     for n, local in seed_users:
@@ -84,7 +90,7 @@ def _seed(s: Session) -> None:
     s.commit()
 
     # 业务线
-    bl_quote = BusinessLine(name="保险报价 Agent", description="车险 / 财险智能报价", owner="李明", jira_project_key="QUOTE")
+    bl_quote = BusinessLine(name="保险报价 Agent", description="车险 / 财险智能报价", owner="李明", jira_project_key="AI")
     bl_cs = BusinessLine(name="智能客服 Agent", description="在线客服首解", owner="周琳", jira_project_key="CS")
     bl_claim = BusinessLine(name="理赔审核 Agent", description="理赔材料智能审核", owner="吴涛", jira_project_key="CLAIM")
     s.add_all([bl_quote, bl_cs, bl_claim])

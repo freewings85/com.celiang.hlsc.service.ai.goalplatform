@@ -1,36 +1,26 @@
-"""「用 Jira 账号登录」—— Atlassian OAuth 3LO 登录、会话、登出。"""
+"""登录 = 用 Jira（Server）的用户名+密码。校验通过即建/认用户、下发会话 cookie。"""
 from __future__ import annotations
 
-import secrets
-
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlmodel import Session, select
 
 from db import get_session
 from deps import SESSION_COOKIE, current_user
+from jira_client import JiraAuth, JiraError, myself
+from jira_config import jira_base_url
 from models import User
-from oauth import (
-    build_authorize_url,
-    exchange_code,
-    fetch_cloud,
-    fetch_identity,
-    get_config,
-    store_tokens,
-)
-from security import decrypt, encrypt, make_session_token
+from schemas import LoginIn
+from security import encrypt, make_session_token
 from serializers import user_dict
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-STATE_COOKIE = "gp_oauth_state"
-
 
 @router.get("/status")
 def auth_status(session: Session = Depends(get_session), user: User | None = Depends(current_user)):
-    cfg = get_config(session)
     return {
-        "configured": cfg.configured,
+        "configured": bool(jira_base_url(session)),
+        "jira_base_url": jira_base_url(session),
         "logged_in": user is not None,
         "user": user_dict(user) if user else None,
     }
@@ -43,66 +33,44 @@ def me(user: User | None = Depends(current_user)):
     return user_dict(user)
 
 
-@router.get("/login")
-def login(session: Session = Depends(get_session)):
-    cfg = get_config(session)
-    if not cfg.configured:
-        raise HTTPException(400, "OAuth 未配置（去设置里填 client_id / secret / 站点）")
-    state = secrets.token_urlsafe(16)
-    resp = RedirectResponse(build_authorize_url(cfg, state), status_code=302)
-    resp.set_cookie(STATE_COOKIE, encrypt(state), httponly=True, samesite="lax", max_age=600, path="/")
-    return resp
+@router.post("/login")
+def login(payload: LoginIn, response: Response, session: Session = Depends(get_session)):
+    base = jira_base_url(session)
+    if not base:
+        raise HTTPException(400, "尚未配置 Jira 站点地址")
+    username = payload.username.strip()
+    if not username or not payload.password:
+        raise HTTPException(400, "请输入 Jira 用户名和密码")
 
+    auth = JiraAuth(base_url=base, username=username, password=payload.password)
+    try:
+        ident = myself(auth)                    # 校验凭据（401 = 账号或密码错）
+    except JiraError as e:
+        if e.status in (401, 403):
+            raise HTTPException(401, "Jira 账号或密码不正确")
+        raise HTTPException(502, f"连接 Jira 失败：{e.message}")
+    except Exception as e:
+        raise HTTPException(502, f"连接 Jira 失败：{e}")
 
-@router.get("/callback")
-def callback(
-    code: str = "",
-    state: str = "",
-    gp_oauth_state: str | None = Cookie(default=None),
-    session: Session = Depends(get_session),
-):
-    # 校验 state（防 CSRF）
-    expected = None
-    if gp_oauth_state:
-        try:
-            expected = decrypt(gp_oauth_state)
-        except Exception:
-            expected = None
-    if not code or not state or state != expected:
-        raise HTTPException(400, "OAuth 回调校验失败（state 不匹配或缺 code）")
-
-    cfg = get_config(session)
-    tokens = exchange_code(cfg, code)
-    access = tokens["access_token"]
-    ident = fetch_identity(cfg, access)          # {account_id, email, name}
-    cloud = fetch_cloud(cfg, access)             # {id, url}
-
-    account_id = ident.get("account_id") or ident.get("accountId") or ""
-    email = ident.get("email", "")
-    name = ident.get("name") or email or account_id
-
-    # upsert：先按 account_id，再按 email（把已播种的同名用户接上），否则新建
-    user = session.exec(select(User).where(User.atlassian_account_id == account_id)).first()
-    if not user and email:
-        user = session.exec(select(User).where(User.email == email)).first()
+    jira_name = ident["name"] or username
+    # upsert：先按 jira_username，再按 email 认已播种用户，否则新建
+    user = session.exec(select(User).where(User.jira_username == jira_name)).first()
+    if not user and ident.get("email"):
+        user = session.exec(select(User).where(User.email == ident["email"])).first()
     if not user:
-        user = User(name=name)
+        user = User(name=ident.get("displayName") or jira_name)
         session.add(user)
-    user.name = name or user.name
-    user.email = email or user.email
-    user.atlassian_account_id = account_id
-    user.oauth_cloud_id = cloud.get("id", "")
-    user.oauth_site_url = cloud.get("url", "")
+    user.name = ident.get("displayName") or user.name or jira_name
+    user.email = ident.get("email") or user.email
+    user.jira_username = jira_name
+    user.jira_password_enc = encrypt(payload.password)
     user.is_active = True
-    store_tokens(user, tokens)
     session.add(user)
     session.commit()
     session.refresh(user)
 
-    resp = RedirectResponse("/", status_code=302)
-    resp.set_cookie(SESSION_COOKIE, make_session_token(user.id), httponly=True, samesite="lax", path="/")
-    resp.delete_cookie(STATE_COOKIE, path="/")
-    return resp
+    response.set_cookie(SESSION_COOKIE, make_session_token(user.id), httponly=True, samesite="lax", path="/")
+    return user_dict(user)
 
 
 @router.post("/logout")

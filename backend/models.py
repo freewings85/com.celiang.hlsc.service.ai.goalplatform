@@ -67,26 +67,24 @@ class Cycle(SQLModel, table=True):
 
 
 class User(SQLModel, table=True):
-    """平台用户 = 一个 Atlassian/Jira 账号（用 OAuth 登录得到，不存密码）。
+    """平台用户 = 一个 Jira（Server/DC）账号。
 
-    首次用 Jira 登录时按 atlassian_account_id 建/认用户；令牌 Fernet 加密存、只写不读。
+    登录就是「用 Jira 的用户名+密码」：校验通过即建/认用户。为了之后能代表该用户
+    调 Jira（建 issue / 关联），密码用 Fernet 加密存（只写不读，任何 GET 都不回显）。
+    Jira Server 8.1 无 OAuth 3LO、无 PAT（8.14+ 才有），故只能存密码。
     """
     __tablename__ = "user"
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
+    name: str                                   # 显示名（Jira displayName），如 陈自飞
     email: str = ""
-    atlassian_account_id: str = Field(default="", index=True)  # Jira 账号唯一标识
-    oauth_cloud_id: str = ""                    # 该用户可访问的 Jira 站点 cloudid
-    oauth_site_url: str = ""                    # 站点浏览地址（拼 /browse/KEY）
-    oauth_access_enc: str = ""                  # 加密的 access token
-    oauth_access_expires: Optional[datetime] = None
-    oauth_refresh_enc: str = ""                 # 加密的 refresh token（用于续期）
+    jira_username: str = Field(default="", index=True)  # Jira 登录名 / key，如 chenzifei（也是 assignee 用的 name）
+    jira_password_enc: str = ""                 # Fernet 加密的 Jira 密码（只写不读）
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class AppSetting(SQLModel, table=True):
-    """全局键值配置。当前只用 key='jira_base_url'（单一 Jira 站点）。"""
+    """全局键值配置：jira_base_url（Jira 站点）、jira_issue_type（建 issue 用的类型名）。"""
     __tablename__ = "app_setting"
     key: str = Field(primary_key=True)
     value: str = ""

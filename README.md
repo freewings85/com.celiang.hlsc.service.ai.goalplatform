@@ -43,24 +43,18 @@ API 文档见 **http://127.0.0.1:8000/docs**。首次启动自动建库并播种
 - ✅ 不做独立「目标详情」页；**执行、文档、附件都放 Jira**（每个目标一个 issue，点 🔗 跳转）
 - ❌ **不做任何达成度 / 百分比计算与自动汇总**（健康度、阶段状态改为人工设置）
 
-## 用 Jira 账号登录（OAuth）+ Jira 联动
+## 用 Jira 账号登录 + Jira 联动（真 Jira Server）
 
-- **登录**：系统打开是一个登录门，点「用 Atlassian 账号登录」→ 走 **Atlassian OAuth 2.0 (3LO)** → 回来即登录。**平台不存密码**；用户按 Atlassian accountId 自动创建/认领。登录后你的 Jira 跳转链接通常也免再登（同浏览器已有 Atlassian 会话）。
-- **每个目标 = 一个 Jira issue**（一对一）。目标树父子关系权威存本平台；父目标已同步时在 Jira 侧建一条 `Relates` link 弱表达（Jira 原生三层封顶、子任务不能嵌套，故不强求它表达无限层级树）。
-- **建目标时「同步到 Jira」开关，默认开**：开=用你登录的授权在该业务线项目下建 issue、回填 key/链接；关=事后可「立即同步」或「关联已有 issue」。同步失败不阻断目标创建。
-- **令牌安全**：OAuth access/refresh token 用 Fernet 加密存（`security.py`，密钥在 `backend/.secret_key`，gitignore），任何接口都不回显；会话是签名 cookie，不是密码。
-- **真集成、可切换**：`jira_client.py` 按 Jira Cloud REST v3（Bearer + ADF）实现，走 `api.atlassian.com/ex/jira/{cloudid}`。设置里填 **client_id/secret + auth/api base** 即生效。
+对接**自建 Jira Server / Data Center**（如 8.1.0），直连真站点，无 mock。
 
-### 先用本地 mock 验证（无需注册、无需真 Atlassian）
-`backend/jira_mock.py` 同时模拟了 Atlassian 的登录/授权（`/authorize`、`/oauth/token`、`/me`）和 Jira 数据接口。默认配置已指向它，开箱即可跑通「登录 → 拿账号 → 建 issue → 跳转」：
-```bash
-cd backend && .venv/bin/uvicorn jira_mock:app --port 8099   # 另开一个终端起 mock
-# 然后打开 http://127.0.0.1:8000/ ，点登录，在假授权页选个身份即可
-```
+- **登录 = 用 Jira 的用户名 + 密码**：系统打开是登录门，填 Jira 账号密码 → 后端拿去 Jira 校验（`/rest/api/2/myself`）→ 通过即登录。用户由登录自动创建/认领。**不做独立系统账号**。
+- **凭据安全**：Jira Server 8.1 无 OAuth 3LO、也无 PAT（8.14+ 才有），故用 Basic auth。密码用 Fernet 加密存（`security.py`，密钥在 `backend/.secret_key`，gitignore），任何接口都不回显；会话是签名 cookie。
+- **每个目标 = 一个 Jira issue**（一对一），建在业务线的「默认 Jira 项目 Key」下（问题类型名可在设置里配，默认「任务」）。目标树父子关系权威存本平台；父目标已同步时在 Jira 侧建一条 `Relates` link 弱表达。指派给目标负责人（若其也用 Jira 登录过）。
+- **建目标时「同步到 Jira」开关，默认开**：开=在该项目下建 issue、回填 key/链接；关=事后「立即同步」或「关联已有 issue」。同步失败不阻断目标创建。**执行、文档、附件都在 Jira**，平台只存目标/计划并链接过去。
+- **REST v2 客户端**：`jira_client.py`（Basic auth + 纯文本描述，走 `{base}/rest/api/2/...`）。换别的 Jira 只改「站点地址」+ 各人登录名密码，代码不动。
 
-### 切到真 Jira（需你做一次性登记）
-1. 去 `developer.atlassian.com` 建一个 **OAuth 2.0 (3LO)** 应用，勾权限 `read:me read:jira-work write:jira-work offline_access`，回调填 `http://<你的域名>/api/auth/callback`，拿到 **client_id + client_secret**。
-2. 在「👥 用户 / 集成」页把 `auth_base` 改 `https://auth.atlassian.com`、`api_base` 改 `https://api.atlassian.com`，填入 client_id/secret。代码不用改。
+### 配置
+在「👥 用户 / 集成」页设 **Jira 站点地址**（默认 `http://192.168.100.130:18080`）和**建 issue 的问题类型**；在「🗂️ 业务线」里给每条线设**默认 Jira 项目 Key**（如 `AI`）。
 
 ## 技术栈
 
@@ -73,8 +67,8 @@ cd backend && .venv/bin/uvicorn jira_mock:app --port 8099   # 另开一个终端
 ```
 backend/    FastAPI 服务
   models / schemas / serializers / security(加密+会话) / db(种子)
-  oauth(Atlassian 3LO) / jira_client(真v3·Bearer) / jira_config / jira_mock(登录+数据 mock) / deps(会话)
-  routers/  auth(登录) · business_lines · cycles · goals(含 Jira 同步/关联) · users · settings(OAuth 配置)
+  jira_client(Jira Server REST v2·Basic) / jira_config(站点+凭据) / deps(会话)
+  routers/  auth(账号密码登录) · business_lines · cycles · goals(含 Jira 同步/关联) · users · settings(Jira 站点)
 frontend/   功能版 SPA（登录门 + 同源托管）
 prototype/  最初的静态原型
 docs/       设计文档（specs）

@@ -108,3 +108,15 @@
 - **本地验证**：`jira_mock.py` 增加 `/authorize`(假授权页)、`/oauth/token`、`/me`、`/oauth/token/accessible-resources`，并把 Jira 数据接口挂到 `/ex/jira/{cloud}/rest/api/3/...`(Bearer)。默认配置指向 mock，开箱即可验证整套登录流程。
 - **切真**：一次性在 developer.atlassian.com 注册 OAuth app 拿 client_id/secret，设置里改 auth_base/api_base 为真 Atlassian 域，代码不动。（注册需人工验邮箱，无法自动完成——本次仅用 mock 验证。）
 - **被替换**：手动 `POST/PATCH /users`、`/users/{id}/jira-token`、`/users/{id}/jira/test`、全局 `jira_base_url` 设置、顶栏用户切换器 —— 均移除。
+
+---
+
+## 附录 2：改为对接真 Jira Server（Basic auth） — 2026-07-12 再追加
+
+用户提供了自建 Jira Server 实例（`http://192.168.100.130:18080`，版本 **8.1.0 / deploymentType=Server**）与一个账号，要求**不要 mock、跑通真集成**。据此把上文的「Atlassian Cloud OAuth 3LO + mock」整体替换：
+
+- **登录 = Jira 用户名/密码**（不做系统账号）。后端拿凭据打 `/rest/api/2/myself` 校验，通过即建/认用户、下发签名会话 cookie。密码 Fernet 加密存（Server 8.1 无 OAuth 3LO、无 PAT，只能存密码）。
+- **客户端改 REST v2 + Basic**：`jira_client.py` 走 `{base}/rest/api/2/issue|issueLink|myself|issue/{key}/assignee`；描述用纯文本（非 ADF）；指派用 `{"name": 用户名}`。
+- **配置**：全局 `jira_base_url` + `jira_issue_type`（默认「任务」）；业务线 `jira_project_key`（种子把首条线设为真项目 `AI`）。链接类型 `Relates`。
+- **删除**：`oauth.py`、`jira_mock.py`（进程 + 代码）、OAuth 配置端点/前端；User 的 OAuth 字段换成 `jira_username` + `jira_password_enc`。
+- **验证**：Playwright 驱动真 UI + 直查真 Jira（Basic）——登录、建目标→真 issue（AI-*）+ 指派、子目标→真 `Relates` link、立即同步、关联已有(AI-6)/无效 key 404/解除，共 16 项全过。测试产生的 issue（AI-15/16/17）因该账号无「删除 issue」权限（403）需人工清理。

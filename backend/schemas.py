@@ -95,28 +95,17 @@ class GoalUpdate(SQLModel):
     sort_order: Optional[int] = None
 
 
-# ---- 用户 ----
-class UserIn(SQLModel):
-    name: str
-    email: str = ""
-    jira_email: str = ""
-
-
-class UserUpdate(SQLModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    jira_email: Optional[str] = None
-    is_active: Optional[bool] = None
-
-
-class JiraTokenIn(SQLModel):
-    token: str = ""                     # 空字符串 = 清除 token
+# ---- 登录（用 Jira 账号密码） ----
+class LoginIn(SQLModel):
+    username: str
+    password: str
 
 
 # ---- 设置 / Jira 关联 ----
-class JiraSettingIn(SQLModel):
-    jira_base_url: str = ""
+class JiraSettingsIn(SQLModel):
+    base_url: Optional[str] = None
+    issue_type: Optional[str] = None
 
 
 class JiraLinkIn(SQLModel):
-    key: str                            # 已有 Jira issue key，如 QUOTE-1203
+    key: str                            # 已有 Jira issue key，如 AI-6

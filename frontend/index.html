@@ -188,11 +188,12 @@
       <div style="width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#22d3ee);display:grid;place-items:center;color:#fff;font-weight:800">G</div>
       <div><b style="font-size:17px">GoalPlatform</b><div class="muted" style="font-size:12px">目标与计划管理</div></div>
     </div>
-    <p class="muted" style="font-size:13px;margin:14px 0 18px">用你的 Jira（Atlassian）账号登录即可使用；登录后系统里的 Jira 跳转通常也免再登。</p>
-    <a class="btn primary" href="/api/auth/login" style="width:100%;justify-content:center;font-size:14px;padding:11px">🔓 用 Atlassian 账号登录</a>
-    <div id="gateWarn" class="note" style="margin-top:14px;display:none">⚠ 尚未配置 OAuth 应用（client_id / secret）。本地默认已指向 mock；真环境请先配置。</div>
-    <div style="text-align:center;margin-top:12px"><a class="muted" style="font-size:12px;cursor:pointer;text-decoration:underline" data-act="toggleGateCfg">⚙ 配置 OAuth 应用</a></div>
-    <div id="gateCfg" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:12px"></div>
+    <p class="muted" style="font-size:13px;margin:14px 0 16px">用你的 <b>Jira 账号</b>登录即可使用。目标同步、关联、文档都直接落在 Jira。</p>
+    <div class="field"><label>Jira 用户名</label><input id="li_user" type="text" autocomplete="username" placeholder="如 chenzifei"/></div>
+    <div class="field"><label>密码</label><input id="li_pass" type="password" autocomplete="current-password" placeholder="Jira 登录密码"/></div>
+    <button class="btn primary" data-act="doLogin" style="width:100%;justify-content:center;font-size:14px;padding:11px">🔓 登录 Jira</button>
+    <div id="gateWarn" class="note" style="margin-top:14px;display:none">⚠ 尚未配置 Jira 站点地址。</div>
+    <div class="muted" style="font-size:11.5px;margin-top:12px;text-align:center">站点：<span id="gateSite">—</span></div>
   </div>
 </div>
 
@@ -246,7 +247,7 @@ const SMAP=Object.fromEntries(STAGE_STATUS.map(s=>[s[0],s]));
 
 const state={view:'workspace',lineId:null,line:null,cycleId:null,
   lines:[],cycles:[],goals:[],byId:{},roots:[],healthFilter:'all',expanded:new Set(),
-  users:[],me:null,oauth:null};
+  users:[],me:null,jira:null};
 function currentUser(){return state.me;}
 
 // ---------- helpers ----------
@@ -283,7 +284,7 @@ async function loadGlobal(){
   state.cycles=await api('/cycles');
   state.lines=await api('/business-lines');
   state.users=await api('/users');
-  state.oauth=await api('/settings/oauth');
+  state.jira=await api('/settings/jira');
   if(state.cycleId===null){
     const act=state.cycles.find(c=>c.status==='active');
     state.cycleId=act?act.id:(state.cycles[0]?state.cycles[0].id:null);
@@ -386,25 +387,29 @@ function renderCycles(c){
 
 // ---------- global: users / integration ----------
 function renderSettings(c){
-  const cfg=state.oauth||{};
+  const cfg=state.jira||{};
   const rows=state.users.map(u=>`<tr>
     <td><b>${esc(u.name)}</b>${state.me&&u.id===state.me.id?' <span class="pill neutral">当前登录</span>':''}</td>
     <td class="muted">${esc(u.email)||'—'}</td>
     <td>${u.linked?'<span class="pill ok">● 已用 Jira 登录</span>':'<span class="pill neutral">未登录过</span>'}</td>
-    <td class="mono muted">${esc(u.account_id)||'—'}</td>
+    <td class="mono muted">${esc(u.jira_username)||'—'}</td>
     <td class="rowbtns"><button class="btn sm danger" data-act="delUser" data-id="${u.id}">删</button></td></tr>`).join('');
   c.innerHTML=`<h2 class="page">用户 / 集成</h2>
-    <p class="sub">登录方式：用 Jira（Atlassian）账号登录，不存密码。用户由登录自动创建/认领。同步 Jira 用你登录后的授权。</p>
+    <p class="sub">登录 = 用 Jira 账号密码。用户由登录自动创建/认领。目标同步 / 关联 / 文档都落在这个 Jira 站点。</p>
     <div class="card pad" style="max-width:680px;margin-bottom:18px">
-      <h3 style="margin:0 0 4px">🔐 OAuth 应用（登录 Jira 用）</h3>
-      <p class="muted" style="font-size:12.5px;margin:0 0 12px">当前状态：${cfg.configured?'<span class="pill ok">● 已配置</span>':'<span class="pill bad">● 未配置</span>'}。本地默认已指向 mock（${esc(cfg.auth_base||'')}）。切真环境把 base 改成 auth/api.atlassian.com，填真 client_id/secret。</p>
-      ${oauthFormHTML(cfg,'oa')}
+      <h3 style="margin:0 0 4px">🔗 Jira 站点</h3>
+      <p class="muted" style="font-size:12.5px;margin:0 0 12px">当前状态：${cfg.configured?'<span class="pill ok">● 已配置</span>':'<span class="pill bad">● 未配置</span>'}。建 issue 用「问题类型」名（不同 Jira 项目类型名可能不同，如 任务 / Task）。</p>
+      <div class="two">
+        <div class="field"><label>Jira 站点地址</label><input id="jira_base" type="text" value="${esc(cfg.base_url||'')}" placeholder="http://192.168.100.130:18080"/></div>
+        <div class="field"><label>建 issue 的问题类型</label><input id="jira_itype" type="text" value="${esc(cfg.issue_type||'')}" placeholder="任务"/></div>
+      </div>
+      <button class="btn primary sm" data-act="saveJira">保存</button>
     </div>
     <div class="section-title"><h3>用户 <span class="muted">(${state.users.length})</span></h3></div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>姓名</th><th>邮箱</th><th>登录状态</th><th>accountId</th><th style="width:80px"></th></tr></thead>
+      <thead><tr><th>姓名</th><th>邮箱</th><th>登录状态</th><th>Jira 用户名</th><th style="width:80px"></th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <div class="note" style="margin-top:14px">用户不用手动建：谁用 Jira 登录过，就自动出现在这里。📊 EddPlatform 仍为预留。</div>`;
+    <div class="note" style="margin-top:14px">用户不用手动建：谁用 Jira 登录过，就自动出现在这里。业务线的「默认 Jira 项目 Key」决定同步到哪个项目（如 AI）。</div>`;
 }
 
 // ---------- 工作台：目标树 + 甘特时间线 ----------
@@ -657,23 +662,11 @@ const actions={
   jiraUnlink:async id=>{if(!confirm('解除与 Jira 的关联？（只清平台侧，不动 Jira 里的 issue）'))return;try{await api('/goals/'+id+'/jira/link',{method:'DELETE'});toast('已解除');await loadGoals();render();}catch(e){toast(e.message,true);}},
   // 用户 / 集成 / 登录
   delUser:async id=>{if(!confirm('删除该用户？其负责的目标会被置为「未指定」。'))return;try{await api('/users/'+id,{method:'DELETE'});toast('已删除');await loadGlobal();render();}catch(e){toast(e.message,true);}},
-  saveOAuth:async()=>{try{const body={client_id:val('oa_id'),auth_base:val('oa_auth'),api_base:val('oa_api'),redirect_uri:val('oa_redir')};const sec=val('oa_secret');if(sec)body.client_secret=sec;await api('/settings/oauth',{method:'PUT',body});toast('已保存 OAuth 配置');await loadGlobal();render();}catch(e){toast(e.message,true);}},
+  saveJira:async()=>{try{const body={base_url:val('jira_base'),issue_type:val('jira_itype')};await api('/settings/jira',{method:'PUT',body});toast('已保存 Jira 站点');await loadGlobal();render();}catch(e){toast(e.message,true);}},
+  doLogin:async()=>{const u=val('li_user');const p=(document.getElementById('li_pass')||{}).value||'';if(!u||!p)return toast('请输入 Jira 用户名和密码',true);try{await api('/auth/login',{method:'POST',body:{username:u,password:p}});location.href='/';}catch(e){toast(e.message,true);}},
   logout:async()=>{try{await api('/auth/logout',{method:'POST'});}catch(e){}location.href='/';},
-  toggleGateCfg:async()=>{const box=document.getElementById('gateCfg');if(!box.style.display||box.style.display==='none'){let cfg={};try{cfg=await api('/settings/oauth');}catch(e){}box.innerHTML=oauthFormHTML(cfg,'gate');box.style.display='block';}else{box.style.display='none';}},
-  saveGateCfg:async()=>{try{const body={client_id:val('gate_id'),auth_base:val('gate_auth'),api_base:val('gate_api'),redirect_uri:val('gate_redir')};const sec=val('gate_secret');if(sec)body.client_secret=sec;await api('/settings/oauth',{method:'PUT',body});const st=await api('/auth/status');document.getElementById('gateWarn').style.display=st.configured?'none':'block';toast('已保存，现在可以登录了');}catch(e){toast(e.message,true);}},
 };
 
-function oauthFormHTML(cfg,prefix){
-  return `
-    <div class="field"><label>client_id</label><input id="${prefix}_id" type="text" value="${esc(cfg.client_id||'')}"/></div>
-    <div class="field"><label>client_secret（留空=不改；已配：${cfg.has_secret?'是':'否'}）</label><input id="${prefix}_secret" type="text" placeholder="填了才更新"/></div>
-    <div class="two">
-      <div class="field"><label>auth_base（真：https://auth.atlassian.com）</label><input id="${prefix}_auth" type="text" value="${esc(cfg.auth_base||'')}"/></div>
-      <div class="field"><label>api_base（真：https://api.atlassian.com）</label><input id="${prefix}_api" type="text" value="${esc(cfg.api_base||'')}"/></div>
-    </div>
-    <div class="field"><label>redirect_uri</label><input id="${prefix}_redir" type="text" value="${esc(cfg.redirect_uri||'')}"/></div>
-    <button class="btn primary sm" data-act="${prefix==='gate'?'saveGateCfg':'saveOAuth'}">保存配置</button>`;
-}
 document.body.addEventListener('click',e=>{
   if(gSuppressClick){gSuppressClick=false;e.preventDefault();e.stopPropagation();return;} // 刚拖动过，吞掉这次 click
   const el=e.target.closest('[data-act]');if(!el)return;
@@ -723,17 +716,20 @@ document.body.addEventListener('mouseup',async()=>{
 document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal();});
 
 // ================= login gate + boot =================
-function showGate(configured){
+function showGate(st){
   document.querySelector('.app').style.display='none';
   document.getElementById('gate').style.display='flex';
-  document.getElementById('gateWarn').style.display=configured?'none':'block';
+  document.getElementById('gateWarn').style.display=st.configured?'none':'block';
+  const site=document.getElementById('gateSite');if(site)site.textContent=st.jira_base_url||'（未配置）';
+  const pw=document.getElementById('li_pass');
+  if(pw&&!pw._wired){pw._wired=1;pw.addEventListener('keydown',e=>{if(e.key==='Enter')actions.doLogin();});}
 }
 function hideGate(){document.getElementById('gate').style.display='none';document.querySelector('.app').style.display='flex';}
 async function boot(){
   let st;
   try{st=await api('/auth/status');}
   catch(e){document.body.innerHTML='<div style="padding:40px;font-family:sans-serif">后端未启动？ '+esc(e.message)+'</div>';return;}
-  if(!st.logged_in){showGate(st.configured);return;}
+  if(!st.logged_in){showGate(st);return;}
   state.me=st.user;hideGate();
   try{await loadGlobal();if(state.view==='workspace')await loadGoals();render();}
   catch(e){document.getElementById('content').innerHTML=`<div class="empty">加载失败：${esc(e.message)}</div>`;}
