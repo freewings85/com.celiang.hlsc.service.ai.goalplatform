@@ -46,6 +46,9 @@ def login(payload: LoginIn, response: Response, session: Session = Depends(get_s
     try:
         ident = myself(auth)                    # 校验凭据（401 = 账号或密码错）
     except JiraError as e:
+        if e.captcha:
+            # Jira 因失败次数过多要求验证码,解锁前正确密码也会被拒;再重试只会越锁越死
+            raise HTTPException(423, "Jira 已锁定该账号（需要验证码）：请先在 Jira 网页退出并重新登录一次完成验证码解锁，或请 Jira 管理员重置失败登录次数，然后再回来登录")
         if e.status in (401, 403):
             raise HTTPException(401, "Jira 账号或密码不正确")
         raise HTTPException(502, f"连接 Jira 失败：{e.message}")

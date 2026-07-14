@@ -28,9 +28,10 @@ class JiraAuth:
 
 
 class JiraError(Exception):
-    def __init__(self, status: int, message: str):
+    def __init__(self, status: int, message: str, captcha: bool = False):
         self.status = status
         self.message = message
+        self.captcha = captcha   # Jira 失败次数过多触发验证码锁定(解锁前正确密码也会被拒)
         super().__init__(f"[Jira {status}] {message}")
 
 
@@ -45,6 +46,7 @@ def _client(auth: JiraAuth) -> httpx.Client:
 
 def _raise(resp: httpx.Response) -> None:
     if resp.status_code >= 400:
+        captcha = "CAPTCHA_CHALLENGE" in (resp.headers.get("X-Authentication-Denied-Reason") or "")
         msg = resp.text
         try:
             data = resp.json()
@@ -53,7 +55,7 @@ def _raise(resp: httpx.Response) -> None:
                 msg = "；".join(str(e) for e in errs)
         except Exception:
             pass
-        raise JiraError(resp.status_code, (msg or resp.reason_phrase)[:500])
+        raise JiraError(resp.status_code, (msg or resp.reason_phrase)[:500], captcha=captcha)
 
 
 def _issue_url(auth: JiraAuth, key: str) -> str:
